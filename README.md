@@ -56,7 +56,7 @@ Requirements
 - Python 3.8.19 or newer
 - Pip and (optionally) a virtual environment
 
-1) Install
+1) Install - venv optional
 ```
 python3 -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate

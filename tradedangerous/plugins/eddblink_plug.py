@@ -82,6 +82,7 @@ class ImportPlugin(plugins.ImportPluginBase):
         'shipvend':     "Update ShipVendors using latest file from server. (Implies '-O system,station,ship')",
         'upvend':       "Update UpgradeVendors using latest file from server. (Implies '-O system,station,upgrade')",
         'listings':     "Update market data using latest listings.csv dump. (Implies '-O item,system,station')",
+        'listings_live':"Update market data using latest listings-live.csv dump. (Implies '-O item,system,station')",
         'all':          "Update everything with latest dumpfiles. (Regenerates all tables)",
         'clean':        "Erase entire database and rebuild from empty. (Regenerates all tables.)",
         'skipvend':     "Don't regenerate ShipVendors or UpgradeVendors. (Supercedes '-O all', '-O clean'.)",
@@ -387,7 +388,7 @@ class ImportPlugin(plugins.ImportPluginBase):
             self.options["force"] = True
         
         # Select which options will be updated
-        if self.getOption("listings"):
+        if self.getOption("listings") or self.getOption("listings_live"):
             self.options["item"] = True
             self.options["station"] = True
         
@@ -477,13 +478,15 @@ class ImportPlugin(plugins.ImportPluginBase):
         if self.getOption("listings"):
             if self.downloadFile(self.listingsPath) or self.getOption("force"):
                 self.importListings(self.listingsPath)
+
+        if self.getOption("listings_live"):
             if self.downloadFile(self.liveListingsPath) or self.getOption("force"):
                 self.importListings(self.liveListingsPath)
-        
-        if self.getOption("listings"):
+
+        if self.getOption("listings") or self.getOption("listings_live"):
             self.tdenv.NOTE("Regenerating .prices file.")
             cache.regeneratePricesFile(self.tdb, self.tdenv)
-        
+
         self.tdenv.NOTE("Import completed.")
         
         # TD doesn't need to do anything, tell it to just quit.

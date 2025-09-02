@@ -29,8 +29,8 @@ What’s Different vs the Original
 - Data model & templates
   - `tradedangerous/templates/TradeDangerous.sql` adds `carrier_docking_access`.
   - One‑time migration: `tradedangerous/templates/database_changes.json` is applied automatically on first run.
-- Repo hygiene
-  - Generated data (`data/`, `*.prices`, `*.db`, caches) stays out of version control.
+- Plugin updates
+  - Added a listings_live option to eddblink so that only live listings can be updated.
 
 The New GUI (td_gui.py)
 -----------------------

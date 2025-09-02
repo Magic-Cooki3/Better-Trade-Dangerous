@@ -10,10 +10,12 @@ REQUIRES PYTHON 3.8 OR HIGHER.
 
 ----------
 
-Better Trade Dangerous (GUI Fork)
+Better Trade Dangerous (GUI, Feature, and Bug Improvement Fork)
 =================================
 
 This fork packages Trade Dangerous with a modern GUI and several quality‑of‑life improvements, while remaining fully compatible with the original command‑line tools.
+
+I have also fixed bugs that are not being worked on by the original dev as of yet and it was easier to just make this then deal with how many bug tickets I'd have to open and that's only if they can reproduce it.
 
 What’s Different vs the Original
 --------------------------------

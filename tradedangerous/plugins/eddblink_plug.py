@@ -482,15 +482,15 @@ class ImportPlugin(plugins.ImportPluginBase):
         if self.getOption("listings"):
             if self.downloadFile(self.listingsPath) or self.getOption("force"):
                 self.importListings(self.listingsPath)
-                self.tdenv.NOTE("Regenerating .prices file.")
-                cache.regeneratePricesFile(self.tdb, self.tdenv)
 
         if self.getOption("listings_live"):
             if self.downloadFile(self.liveListingsPath) or self.getOption("force"):
                 self.importListings(self.liveListingsPath)
-                self.tdenv.NOTE("Regenerating .prices file.")
-                cache.regeneratePricesFile(self.tdb, self.tdenv)
-        
+
+        if self.getOption("listings") or self.getOption("listings_live"):
+            self.tdenv.NOTE("Regenerating .prices file.")
+            cache.regeneratePricesFile(self.tdb, self.tdenv)
+
         self.tdenv.NOTE("Import completed.")
         
         # TD doesn't need to do anything, tell it to just quit.

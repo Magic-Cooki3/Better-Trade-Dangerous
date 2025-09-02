@@ -1,0 +1,1314 @@
+==============================================================================
+TradeDangerous, Copyright (C) Oliver "kfsone" Smith, July 2014
+==============================================================================
+
+Mar 02 2018 (bgol, horizon branch):
+. Item maintenance.
+. Two new Ships (Alliance Chieftain, Type-10 Defender).
+. Updated EDAPI plugin to version 4.3.2
+  - Ignore empty Outfitting list.
+  - Added "marketId" to commodity, shipyard and outfitting message.
+  - Added "economies" and "prohibited" to commodity message.
+
+Oct 2017 (bgol, horizon branch):
+. Item maintenance.
+. Journal plugin just skips faulty lines.
+. Updated EDAPI plugin to version 4.3.1
+  - Reworked "/market" and "/shipyard" check from cAPI.
+
+Sep 2017 (bgol, horizon branch):
+. Item cleanup (just ignore all the errors about "Cooling Hoses").
+
+Sep 23 2017 (bgol, horizon branch):
+. Updated EDAPI plugin to version 4.3.0
+  - Added "/market" and "/shipyard" check from cAPI.
+  - Get station data from the new "services" entry if available.
+  - Updated item handling for upcoming ED 2.4 cAPI changes.
+. Updated Journal plugin to use "StationServices" if available.
+. Data update from maddavo.
+
+Jul 03 2017 (bgol, horizon branch):
+. Updated EDAPI plugin to version 4.2.0
+  - Added "login" option.
+  - EDDN Server Migration
+
+May 31 2017 (bgol, horizon branch):
+. Updated Journal plugin to ignore all events in multicrew.
+. Missed the station command to output the category name.
+. Item 'Neofabric Insulation' is only in category 'Industrial Materials'.
+. Some new salvage items and updated average prices.
+
+May 23 2017 (bgol, horizon branch):
+. Don't change the planetary state if updating via the station command
+  without specifying it.
+. Updated EDAPI plugin to version 4.1.1
+. Updated Journal plugin to recognise the "Location" event.
+. Updated Journal plugin to recognise the "MarketSell" event to capture
+  black market sales.
+
+May 22 2017 (bgol, horizon branch):
+. Updated buy, rares, run and trade command to also output the
+  category name of the item if more details are requested.
+. Data update from maddavo.
+
+May 21 2017 (bgol, horizon branch):
+. Updated some ship prices.
+. New import plugin "Journal" which parses the Journal-files and add new
+  systems and stations to the database (see README for description).
+
+May 13 2017 (bgol, horizon branch):
+. Updated EDAPI plugin to version 4.1.0
+  - Shipyard handling reworked.
+. Updated RareItem based on Capitan Ace Rimmer (http://www.hozbase.co.uk/elitedangerous)
+. Data update from my netLog.
+
+May 12 2017 (bgol, horizon branch):
+. Updated the "netLog" plugin to accept new log format (>= 2.3)
+. Added Dolphin (ship)
+. Data update from maddavo.
+
+Feb 17 2017 (bgol, horizon branch):
+. Data update from maddavo.
+. Updated EDAPI plugin to version 4.0.0
+  - Login process reworked.
+. Updated EDAPI plugin to version 4.0.1
+  - 4.0.0 broke the save option.
+
+Oct 26 2016 (bgol, horizon branch):
+. New ship "Beluga Liner".
+. Data update from maddavo.
+. Even with zero demandunits the station does pay the price.
+
+Oct 14 2016 (bgol, horizon branch):
+. Data update from maddavo.
+. Updated EDAPI plugin to version 3.7.5:
+  - Updated shipyard to EDDN v2 schema.
+  - Updated outfitting to EDDN v2 schema.
+  - Updated commodity to EDDN v3 schema.
+
+Jul 08 2016 (bgol, horizon branch):
+. Updated EDAPI plugin to version 3.7.4:
+  - Let the user know about the API response.
+  - New option "test=[FILENAME]" to test the plugin.
+  - New option "warn" to ask the user if the API response differ from
+    the database entry of the station.
+    Default behavior is now to just warn the user know about it.
+
+Jul 07 2016 (bgol, horizon branch):
+. Updated EDAPI plugin to version 3.7.3:
+  - Reworked station data handling
+  - Reworked consistency checks for API <-> DB diffs
+
+Jul 06 2016 (bgol, horizon branch):
+. Data update from maddavo.
+. New EDCD plugin which also can update the items.
+. Updated EDAPI plugin to version 3.7.2:
+  - Call new EDCD plugin for option 'edcd'
+  - Reworked demmand/supply handling
+  - Added consistency checks for "what" to import compared to what the
+    station should offer.
+
+Jul 05 2016 (bgol, horizon branch):
+. Added category and suppressed to RareItem and updated data.
+. Show "Category/Itemname" if more detail is requested for the "rares" command.
+
+Jul 03 2016 (bgol, horizon branch):
+. New import plugin "netLog" which parses the netLog files and add new
+  systems to the database (see README for description).
+
+Jul 02 2016 (bgol, horizon branch):
+. Merged changes from devel branch into horizon (see below).
+. Data update from maddavo.
+. Added "--planetary" argument to buy, local, nav, rares, run and sell command.
+  The "--no-planet" and "--planetary" arguments are mutually exclusive.
+  (implemented issue #5)
+
+Jul 02 2016 (bgol, devel branch):
+. "Chunked" transfers don't need a length header.
+. Added new tables for FdevID -> EDDN mapping
+. Added FDEVMapping classes for Items, Ships, Shipyard
+  and Outfitting.
+. Update EDAPI plugin to version 3.7.0:
+  - New option "edcd" to download FDevShipyard and FDevOutfitting data.
+  - Using new mapping classes to map the IDs from the API.
+  - Delete old ShipVendor entries to avoid stale data.
+
+Jul 01 2016 (bgol, horizon branch):
+. Update EDAPI plugin to version 3.6.3
+
+Jun 30 2016 (bgol, devel branch):
+. Added autoconfirm (--yes) to edsmupdate.py
+. Added FDEV ID to Item and Ship table for API mapping.
+. Added average price to Item table (as shown ingame).
+
+Jun 28 2016 (bgol, horizon branch):
+. (maddavo) Renamed item "Low Temperature Diamond" to "Low Temperature Diamonds"
+. added EDSM utils (implemented issue #1)
+
+Jun 21 2016 (bgol, horizon branch):
+. Renamed item "Power Transfer Conduits" to "Power Transfer Bus"
+
+Jun 10 2016 (bgol, horizon branch):
+. "--no-planet" switch now requires planetry to be "N" (issue #5)
+. Updated README
+. data update from maddavo
+. New items for 1.6/2.1 update
+. Update EDAPI plugin to version 3.6.2
+
+v7.4.0 Jan 27 2016
+. Merged Tyler Lund's support for posting data to EDDN from edapi.
+. (kfsone) Merged Maddavo data.
+
+v7.3.3 Jan 22 2016
+. (kfsone) Maddavo Horizons import.
+
+Jan 16 2016 (bgol, horizon branch):
+. Fixed typo in EDAPI plugin
+. Horizon ship updates (thanks dave, fixes #4)
+
+Jan 15 2016 (bgol, horizon branch):
+. Overlooked one check for noPlanet switch. Fixes bug #2
+. Latest maddavo data update.
+
+Dec 22 2015 (bgol, horizon branch):
+. Update EDAPI plugin to version 3.6.0
+
+Dec 21 2015 (bgol, horizon branch):
+. Don't merge the prices form maddavo anymore (use --merge-import if you need it).
+. New items with version 1.5/2.0 of ED
+. data update from maddavo
+. Added "planetary" column to station table and maddavo import.
+. Added "--planetary" argument to station command.
+. Added "--no-planet" switch to buy, local, nav, rares, run and sell command.
+. Added "Plt: X" output.
+
+v7.3.2 Jul 30 2015
+. (kfsone) Alternate fix for edapi.
+
+v7.3.1 Jul 21 2015:
+. (kfsone) Fix for edapi.
+
+Jul 07 2015:
+. (kfsone) Fixed division by zero in transfers.py with empty file
+
+v7.3.0 Jul 05 2015:
+. (ahamid/kfsone) "fromfile" support for command options:
+ - All commands will now look for a "fromfile" specifying default arguments
+   for that command .tdrc_{cmd} e.g .tdrc_nav or .tdrc_shipvendor,
+ - One argument-position per line, "--ly 20" is two lines but "--ly=20" is one,
+ - The fromfile argument is replaced with the arguments in the file,
+ - Looks in the current directory and then your user directory,
+ - You can also use your own fromfile as an argument prefixed with a '+':
+     trade.py nav +myfrom.txt
+. (Fred Deschenes) "buy" now supports categories e.g.
+     trade.py buy --near sol metals,food
+ - to find food cartridges, use foodc or "food cartridges",
+
+Jun 20 2015:
+. (kfsone) Lots of new systems (until EDSC broke),
+. (kfsone) Minor optimizations,
+. (kfsone) Tweaks to edscupdate,
+
+v7.2.1 Jun 16 2015:
+. (maddavo) Lot of cleanup
+
+v7.2.0 Jun 14 2015:
+. (Orphu) Created an import plugin that uses Frontier's Mobile API,
+    - See README.md for more help,
+    - Use "trade.py import -P edapi" to get started,
+    - Able to optionally upload prices it pulls to EDDN:
+        trade.py imp -P edapi -O eddn
+. (maddavo) Fixed/merged lots of new systems,
+
+v7.1.2 Jun 6 2015:
+. (Dry411s) Diamondback prices
+. (Orphu) Imperial courier price
+. (kfsone) Maddavo Data import/refresh
+
+v7.1.1 May 25 2015
+. (kfsone) Added "--distance" option to "edscupdate" which shows the 10
+      closest candidates.
++ (kfsone) Over 500 new core systems
+
+v7.1.0 May 11 2015
+. (kfsone) #236 Unicorn (erh, Unicode)
+    - Added code to trade.py to catch wild unicode errors, esp under windows:
+      Windows console is NOT utf-8 based, which means that when TD tries to
+      print a unicode character, an error occurs. I've added code to catch
+      this early (TradeEnv.uprint) and code to catch it late (trade.py),
+    - Changed various file openings to "utf-8",
+. (gazelle) Changed display of "adding/removing ships" in shipvendor sub-command
+. (kfsone) #234 Change display of "adding ship" in maddavo plugin
+. (kfsone) Fix submit-distances/edscupdate generating duplicate extra-stars.
+
+v7.0.3 May 09 2015
+. (kfsone) "run" command:
+    - Added "--show-jumps" (aka -J)
+    - Jumps are no-longer shown by default,
+    - Request #233 Jumps now include distance
+    - If start and end station of a hop are in the same system,
+      display "Supercruise to ..." instead of a jump
+    - When a hop involves multiple jumps using --show-jumps, it will
+      tell you the direct and total distances,
+. (kfsone) Revamped the intro of the README.md (http://kfs.org/td/source)
+. (gazelle) Corrected unicode system names (Argetlamh etc)
+
+v7.0.2 May 05 2015
+. (kfsone) Added "--demand" option to "run", filters based on demand.
+      CAUTION: Items with "?" demand will be ignored when using --demand.
+      If you want to enter demand values in the update tool, you will
+      need to use the "--use-demand" (-D) option of "update".
+. (kfsone) Fixed #231 Exception when using --quantity in buy/sell
+. (kfsone) --supply is now an alias for --quantity in "buy"
+. (kfsone) --demand is now an alias for --quantity in "sell"
+. (kfsone) Fixed #232 'supply' values ignored by "run"
+
+v7.0.1 May 04 2015
+. (kfsone) Minor fixes from forums
+. (kfsone) Fixed issue causing some users to get a numpy import error
++ Extra data and Rares
+
+v7.0.0 May 03 2015
+CACHE BUILD REQUIRED (trade.py buildcache -fi)
+"requests" packages is now required if you want to use maddavo's plugin
+. (Avi) README.txt has been replaced with README.md
+. (kfsone) "import" command (non-plugin behavior)
+    - Restored the default behavior of forcefully overwriting existing data
+      with values from the .prices file and deleting items that aren't listed
+      in the import.
+    - Added "--merge-import" option: only imports entries that are newer than
+      existing local data and only removes entries when there is an explicit
+      entry for it with 0 prices.
+    - Changed "--reset" to "--reset-all" because it's a scary command,
+. (kfsone) Consistency of various commands:
+    - "demand" refers to what a station will buy,
+    - "supply" refers to what a station is selling,
+    - Changed several command options from "--stock" to "--supply",
+    - "--black-market" is now consistently spelled with a hyphen
+       (or just --black for short),
+    - "--bm" now has two hyphens in all uses (it was -bm in some cases),
+. (kfsone) "market" command:
+    - Only show the age of items once,
+. (kfsone) "nav" command:
+    - Fixed --refuel-jumps
+    - Added --pad-size to limit which stations will be listed/refuelled at,
+. (kfsone) "buy" and "sell" commands:
+    - Added "--black-market" (--bm) option,
+    - Added "--avoid" option (accepts station and/or system names)
+. (kfsone) Performance:
+    - Re-unified the StationBuying/StationSelling tables into StationItem,
+    - Added StationBuying and StationSelling views,
+    - Minor refactor of getTrades to reduce the pathalogical near O(n^2)
+      behavior it used to match buyers to sellers,
+    - Improved performance of nav command slightly,
+    - "import" plugin now uses the "requests" module, which means that
+      it will automatically download/use compressed .prices files when
+      they are made available. E.g. maddavo's .prices files now require
+      upto 5x less bandwidth,
+    - Added code to allow experimental use of numpy,
+
+v6.18.6 Apr 27 2015
+. (kfsone) Fixed #225 'Generator already running'
+. (kfsone) Performance improvement: Reduced the cost of "getTrades"
+
+v6.18.5 Apr 26 2015
+. (kfsone) Fixed #224 run -vv and above was raising an exception
+. (kfsone) Fixed #223 "unrecognized system" errors
+. (gazelle) Lots of data fixes
+. (snakeman via maddavo) Lots of station fixes
+
+v6.18.4 Apr 24 2015
+. (kfsone) Fix for updateLocalSystem that would change ALL systems at once
+
+v6.18.3 Apr 19 2015
+. (kfsone) Added "--shorten" (requires --to)
+        Will show routes with less hops if they produces a better gpt
+. (kfsone) "import" maddavo plugin:
+        - Added sanity checking of timestamps during System.csv import
+          (there was a new system in mad's data with an apostrophe in the
+           modified timestamp)
++ (kfsone) ~310 new systems
+
+v6.18.2 Apr 18 2015
+. (kfsone) Added "--loop-int" (-li) option to "run"
+        trade.py run ... --loop-int 2
+        will require a minimum of 2 hops before visiting the same station
+
+v6.18.1 Apr 13 2015
+. (kfsone) import: forcibly set market flag to 'Y' in the database for
+        stations that have items listed,
+. (kfsone) tradedb: override the database's "market" attribute with 'Y'
+        when loading stations if the item count > 0
+. (kfsone) "maddavo" plugin: add Mad's corrections to our own for the
+        duration of the import so we don't immediately re-add bad data.
++ (kfsone) ~200 new systems
+
+v6.18.0 Apr 11 2015
+. (kfsone) #215 removed "AltItemName" table
+. (kfsone) #216 fixed a crash when using "direct" cleanly
++ Apr 09 2015: ~200 new systems
+. Apr 11 2015: ~100 new systems
+
+v6.17.5 Apr 08 2015
+. (kfsone) Fixed problem with 'import' not updating dates
+
+v6.17.4 Apr 06 2015
+. (kfsone) Fixed issue preventing removal of items in the update UI
+. (kfsone) Added "-P" alias for "--plug" option of "import" command
+
+v6.17.3 Apr 05 2015
+. (kfsone) Fixed a problem when distance pruning removed everything
+. (kfsone) Added "--summary" to "run" for a cleaner summary route (use with -vvv)
+
+v6.17.2 Apr 04 2015
+. (kfsone) "buy" command
+  - Show ship costs when listing multiple ships,
+. (kfsone) "run" command
+  - Added "--stock" option to set minimum stock level required,
+  - Added extra detail to "--progress" output,
+. (gazelle) Bash completition improvements
+
+v6.17.1 Apr 04 2015
+. (kfsone) Various minor tweaks
+. (kfsone) Improvements to presentation of edscupdate
+. (kfsone) Added another 30 or so systems
+. (kfsone) edscupdate now ignores any systems that start with "PLAA EURIK"
+
+v6.17.0 Apr 03 2015
+.(tKe) "import" behavior:
+   This change makes it so that "import" will not overwrite existing
+   data with older values unless the "--reset" option is used.
+. (kfsone/tKe) #211 "local" command was a mess
+  - Don't double up system names on station lines,
+  - Trail station names with dots to make those lines more distinct,
+. (tKe) Fixed a bug that caused routes to be pruned when they shouldn't
+. (tKe) #145 Support for unit suffixes for credits, e.g.
+    1k = 1000, 1.5m = 1,500,000, 1.2b = 1,200,000,000
+
+v6.16.1 Apr 01 2015 (In some parts of the world)
+. (kfsone) "old" sub-command
+   - Added a "--route" option: which probably doesn't do what you think,
+   - Added a "--min-age" option: because old is the new new!
+
+v6.16.0 Mar 29 2015
+. (tKe) "run" command
+   - "--loop" option
+     Looks for routes which loop back to the origin station,
+   - Optimizations,
+   - Minor bug fix in destination culling,
+
+v6.15.0 Mar 27 2015
+. (kfsone) Refresh .prices file after removing a station that had items
+. (kfsone) Maddavo Plugin
+   - Added support for "corrections"
+     "--opt=corrections" and "--opt=csvs" will read Maddavo's correction data
+     correction data is read first and is applied to existing data,
+   - Support for Category, Item, System, Station, Ship, ShipVendor and
+     RareItem name changes and deletions,
+   - System, Item and Station deletions can be very slow if there are prices
+     in the database, be patient,
+   - "--opt=csvs" now also enables "exportcsvs"
+   - "--opt=exportcsvs" not exports 
++ Over 100 additional Systems
+API:
+. (kfsone) transfers.CSVStream will give a line-by-line report of utf-8
+     decode errors but continue streaming.
+
+v6.14.6 Mar 25 2015
+. (kfsone) Item names in .price files are now case insensitive (Ai Relics)
++ Over 100 systems
+
+v6.14.5 Mar 23 2015
+. (kfsone) Solved the missing 6.14.3 commits
+
+v6.14.4 Mar 22 2015
+. (gazelle) Bernd's "getstation.sh" script (see scripts/README.txt)
+. (kfsone) Fixed #209 Exception when you couldn't afford something,
+. (kfsone) Fixed #210 Exception when --from not reached,
+. (kfsone) Added "Salvage" Category,
+. (kfsone) Added "AI Relics" and "Antiquities" Items,
+ - You will want to "trade.py buildcache -f -i"
+
+v6.14.3 Mar 17 2015
+. (kfsone) Windows improvements to misc/madupload.py,
+. (kfsone) EDDB v3 support,
+. (kfsone) "--towards" should be much better behaved
+
+v6.14.2 Mar 15 2015
+. (kfsone) Minor tweaks
+. (kfsone) Removed the "tradingWith" cache because its hit rate was so low
+           it was actually decreasing performance
+. (kfsone) Tweaked how --prune and --max-routes interact
+. (kfsone) Little performance boost
+
+v6.14.1 Mar 13 2015
+. (kfsone) Minor fixes
+. (kfsone) Derp defense,
+. (kfsone) Added misc.importeddbstats
+. (kfsone) Imported Station attributes from eddb,
+. (kfsone) Cleaned out some cruft,
+
+v6.14.0 Mar 13 2015
+. (kfsone) Station data:
+  - Added "outfitting", "rearm", "refuel" and "repair" fields,
+  - Added options to "local" and "station" commands,
+  - Added output to "local", "station" and "nav" commands,
+  - Added support to maddavo import,
+
+v6.13.4 Mar 13 2015
+. (WombatFromHell) "run" command:
+  - Added "--max-gain-per-ton" (--mgpt) option
+    Default: 10000cr
+    Controls the maximum profit/ton that TD will believe
+
+v6.13.3 Mar 11 2015
+. (kfsone) Fixed "--blackmarket" and "--trading" in local,
+. (Dry411s) Resolves #200 New ships for 1.2,
+. (kfsone) +103 Systems
+. (kfsone) OCR Derp fixes
+. (kfsone) Station cleanup
+. (Dry411s) Resolves #203 New ShipPrices per 1.2.03,
+. (orphu) ShipVendor updates
+
+v6.13.2 Mar 10 2015
+. (Tromador) Added "Painite" to Item.csv
+. (kfsone) import plugin now allows you to separate --opt values with ,
+   e.g. trade.py import --plug=maddavo --opt=csvs,csvonly
+   will import mad's csv files without importing his prices
+. (kfsone) 112 new systems
+
+v6.13.1 Mar 06 2015
+. (kfsone) "shipvendor" command:
+  - Default action is now to list ships at given station, e.g.
+    trade.py shipvendor galileo
+  - Added "--name-sort" (--name) to sort list by ship name,
+. (kfsone) Fixed some problems with maddavo's import,
+. (kfsone) Added "WARNING" level events (use -qq to disable),
+. (kfsone) Fixed #195 "local" ValueError when no stations listed,
++ Dry411S: ShipVendors
+
+v6.13.0 Mar 03 2015
+. (kfsone) Added "modified" column to ShipVendor table,
+. (kfsone) "maddavo" import plugin:
+  - Added "--opt=shipvendors" which imports his ShipVendor.csv,
+    - Entries with a 'modified' of "DELETED" will be
+  - Added "--opt=csvonly" to stop after importing any csv files (no prices),
+  - Added "--opt=csvs" to import all the csvs
+    (equivalent to typing --opt=systems --opt=stations --opt=shipvendor)
+  e.g.
+    trade.py import --plug=maddavo --opt=csvs --opt=csvonly
+    trade.py import --plug=maddavo --opt=stations
+. (kfsone) "market" sub-command:
+  - Default behavior is equivalent to "--buy --sell",
+  - You now only need to specify --buy (-B) or --sell (-S) to list ONLY
+    those columns, so "trade.py market SOL -vv" now shows both sets of data.
+. (kfsone) "local" sub-command:
+  - Added "--stations" option: only list systems with stations,
+  - Added "--trading" option: only list stations that are flagged as having
+    a market or have trade data available
+  - Added "--blackmarket" option: only list stations with a black market,
+  - Added "--shipyard" option: only list stations with a ship yard,
+. (kfsone) "run" sub-command:
+  - check from stations for whether they have anything that can be bought,
+  - better feedback on some edge-cases where a route cannot be found,
+  - fixed some problems with --via,
+  - better feedback when using --jumps=0 or --ly=0,
+
+v6.12.4 Mar 02 2015
+. (kfsone) Added 175 Systems,
+. (kfsone) Fixed #193 "run" was ignoring --ls-max,
++ DRy411S : ShipVendors
+
+v6.12.3 Mar 01 2015
+. (kfsone) Improved how we handle some edge cases with --from and --to,
+. (kfsone) Improved feedback when requesting an unreachable journey,
+   e.g. --from selianciens --to eravate --ly 9.23 --hops 2 --jumps 2
+   (the journey requires at least 9 jumps but the options only allow 4),
+. (kfsone) Fixed #185 --from and --to giving a "set" error,
+. (kfsone) Fixed #188 Allow multiple ships per "shipvendor",
+. (kfsone) Fixed #190 "station -r" wasn't updated the .csv file,
+. (kfsone) Cleaned up the output of "local" command when showing stations,
+. (kfsone) Fixed #191 'set' does not support indexing
++ DRy411S : ShipVendors
+
+v6.12.2 Feb 26 2015
+. (kfsone) "run" command:
+  - added "--direct" option:
+    - only allows 1 hop,
+    - --jumps and --ly-per are ignored entirely,
+    - ignores route/distance between stations,
+   e.g.
+     trade.py run --from achenar --to lave --cap 50 --cr 100000 --direct
+
+v6.12.1 Feb 26 2015
+. (kfsone) "buy" command:
+  - now accepts multiple arguments (e.g. explosives,clothing),
+  - new "--one-stop" (-1) option only shows stations that carry the full list,
+  - mixing ships and items is not allowed,
+   e.g.
+     trade.py buy food clothing fish
+     trade.py buy --near achenar fish,food,grain --one-stop
+     trade.py buy --near achenar --ly 100 type6,type7 --one-stop
+     trade.py buy --near achenar --ly 100 type6,type7 -1
+
+v6.12.0 Feb 23 2015
+. (kfsone) Added "market", "shipyard" and "modified" values to Station table
+. (kfsone) "submit-distances" now has proper argument parsing, see --help
+
+v6.11.0 Feb 21 2015
+. (kfsone) Added "market" command for viewing station buy/sell list
+   e.g. trade.py market ramoncity --buy --sell -vv
+. (kfsone) Lots of improvements to edscupdate.py;
+   - added --random, checks 10 random new systems,
+   - added --conf N for changing the confidence rating,
+   - added --detail (-v) and --debug (-w),
+   - added --summary
+   - added --test (use the EDSC test database),
+   - added explanatory "splash" text (--no-splash or -NS to skip),
+. (kfsone) Allow a cache rebuild at the start of a mad import
++ (kfsone, maddavo) Lots of Systems and Stations
+
+v6.10.0 Feb 14 2015
+. (kfsone) Major changes to the 'maddavo' plugin:
+    - The plugin now supports "merging" of Systems and Stations from
+      maddavo's site into your local db. It does not, by default, write
+      these to the ".csv" files.
+    - Removed "--opt=syscsv" and "--opt=stncsv",
+    - Added "--opt=systems" and "--opt=stations" and "--exportcsv",
+    - Assorted cleanup
+Also:
+. (kfsone) "run" with "--progress" is less silent,
+. (kfsone) Fixed 'set changed size' error in run command
+. (kfsone) Improvements to the TradeCalc api for accessing station trades
+. (kfsone) Added "--gain-per-ton" (--gpt) to run command
+. (kfsone) Added "CSVStream" class to transfers.py
+. (kfsone) Added "Progress" progress-bar class to misc/progress.py
++ 130 new systems from EDSC
+
+v6.9.2 Feb 08 2015
+. (kfsone) Feature #158 Find rares based on distance from multiple systems
+       "--away <ly>" and "--from <system1> --from <system2> ..."
+. (kfsone) "run" -vv output now shows buy and sell price, use -vvv for totals
+. (kfsone) Issue #165 "--to" for system without stations gave wrong result,
+. (kfsone) Feature #161 Allow nav to require fuel stops
+       "--refuel-jumps" (--ref for short) lets you specify the maximum
+       number of consecutive non-station systems to allow on the route
+. (dl4ner) Added maddavo options to README
+. (kfsone) Feature #153 min/max values for sell/buy (--gt and --lt)
+
+v6.9.1. Feb 08 2015
+. (kfsone) Issue #163: Added "--opt=use3h", "--opt=use2d" and
+       "--opt=usefull" options to the maddavo pluggin.
+. (kfsone) Fixed a division by zero bug in the --towards option,
+. (kfsone) Fixed --towards showing a different destination when it
+       was able to reach the goal system with a low-scoring trade,
++ Systems, Stations: (kfsone) Curated EDSC and Maddavo
+
+v6.9.0 Feb 06 2015
+. (kfsone) Added "--towards" option to "run" command:
+       --towards GOALSYSTEM will restrict the route to destinations which
+       move the player towards GOALSYSTEM.
+. (kfsone) Added "distanceTo" function to "System" which returns the
+       distance in ly to a second system,
+. (kfsone) Minor performance gain in distance calculations,
+
+v6.8.5 Feb 04 2015
+. (kfsone) Added "trade" command to list station-to-station trades,
+. (kfsone) "station" command now lists 5 sell and 5 buy items,
+. (kfsone) "station" does a better job of parsing existing station names,
+. (kfsone) Removed "--system" from "station" command, use
+       trade.py station -a "SYSTEM/Station"
+       syntax instead.
+. (OpenSS) Added "Run To" option to trade.bat,
+. (kfsone) Speed improvements to .csv and .prices loading,
+. (kfsone) maddavo plugin tries to explain encoding errors,
+. (chmarr) Fixed trade.py using the wrong argument list (#herp),
+. (kfsone) titleFixup will handle 'von', 'de' and 'du' correctly,
++ Station/Rare Data (RavenDT)
+
+v6.8.4 Feb 01 2015
+. (kfsone) Fixed tradecalculator not selecting most profitable trade sometimes
+. (kfsone) Set 'BRUTE_FIT' in the environment to force use of the brute-force
+        trade calculator (for diagnostic purposes). e.g.
+           BRUTE_FIT=1 trade.py run ...
+
+v6.8.3 Jan 31 2015
+. (kfsone) Code and data cleanup, added stations
+. (kfsone) Added misc/eddn.py API for developers wanting to access EDDN,
+
+v6.8.2 Jan 27 2015
+. (kfsone) Issue #148 Don't blow up horribly when tkinter is missing,
+. (kfsone) Issue #149 "nav" with --via was broken,
+. (kfsone) Typo correction in the maddavo splash (thanks, Stefan),
++ Stations: Tromador, Dave Ryalls, Jason Zions, MacNetron
+
+v6.8.1 Jan 25 2015
+. (kfsone) Additional rules to prevent data pollution (ocr derp protection),
+. (kfsone) Support for maddavo's "3 hour" prices file,
+. (kfsone) Changed how downloads work to massively improve download speeds,
+. (kfsone) Improvements to the EDSC tools,
+. (kfsone) "First time" banner explaining the maddavo import plugin,
+. (kfsone) Fixed "shipvendor" command doing a poor job of finding stations,
+. (kfsone) "submit-distances" will now prompt you to correct distances that
+        EDSC reports as needing confirmation,
+. (kfsone) Fixed a crash when data was > 1 month old,
+. (kfsone) (API) Added a helper for clipboarding data,
+. (kfsone) (API) Added misc.edsc.StarSubmissionResult,
+. (kfsone) (API) Cleaned up various pieces of code documentation,
++ Data: Systems, Stations, Ships, lots of corrections/deletions too,
+
+v6.8.0 Jan 19 2015
+. (Dirk Wilhelm/kfsone) Added 'shipvendor' command,
+. (kfsone) Issue #135 show data age in checklist / on mfd
+. (kfsone) Issue #140 explain what/why 'requests' is required,
+. (kfsone) Issue #142 "--stations" with "nav" command caused error,
+. (kfsone) Added code to fight OCR Oerp,
+. (kfsone) '--ls-max' will now also unknown (0) distances,
+. (kfsone) Added '--max-routes' for setting an absolute max on how many
+        of the top routes we use after the first hop,
+. (kfsone) Added 'submit-distances' tool for submitting EDStarCoordinator
+        star data.
+. (kfsone) Added '--prune-score' and '--prune-hops' to run; these let
+        you discard routes that are under-performing early on which
+        can make calculating longer runs more efficient.
+. (kfsone) Added "--progress" to "run" to show the current hop,
+. (kfsone) "run" and TradeCalc are much smarter about which hops
+        they will consider when using --max-age, --blackmarket, etc.
+        (big perf win)
+. (kfsone) Renamed "misc/edstarquery.py" to "misc/edsc.py"
+        - Added misc.edsc.StarSubmission
+        - Renamed misc.edsc.EDStarQuery to misc.edsc.StarQuery
+        - Changed "submit-distances" to use "StarSubmission"
+
+v6.7.0 Jan 17 2015
+. (kfsone) ".prices" import automatically creates local placeholders
+        for unknown stations when using "-i", e.g:
+            trade.py buildcache -f -i
+            trade.py import --plug=maddavo  (this plugin sets -i for you)
+. (kfsone) Added a "--ls-max" option to "run" for filtering stations
+. (kfsone) +140 Systems
+. (tKE)  "buy" sub-command now supports ship names (find a ship vendor)
+. (kfsone) Partial code/documentation cleanup
+. (kfsone) Added a "getRoute" function to TradeDB()
+        import tradedb
+        tdb = tradedb.TradeDB()
+        lave = tdb.lookupPlace("Lave")
+        barn = tdb.lookupPlace("Barnard's Star")
+        tdb.getRoute(lave, barn, maxJumpLy=12)
+
+v6.6.1 Jan 10 2015
+. (kfsone) Added "--blackmarket" option to "run" command, restrictions
+    to stations which have a black market.
+. (kfsone) Added "--end-jumps" ('-e') to "run" command, includes stations
+    from systems within this many jumps of the specified --to.
+      e.g.
+        trade.py run --from sol --to lave -e 3
+        will find runs from sol to somewhere within 3 jumps of lave.
+. (kfsone) "rares" now has a friendly error when no rares are found
++ Data: kfsone, maddavo, Dave Ryalls, NeoTron, Tyler Lund, Jared Buntain,
++ Stars: EDStarQuery/kfsone
+  [I'm adding several hundred new systems from EDStarQuery but I'm also
+   manually vetting all of them!]
+
+v6.6.0 Jan 08 2015
+. (kfsone) Overhaul of loading of trades and adjancent-system finding
+  - Item data is loaded as discrete sales and purchases in TradeCalc,
+  - Trades (X Selling, Y Buying) are lazily populated by TradeCalc,
+  - TradeDB now builds a "StellarGrid" rather than relying on the
+    database for locality searches; massive perf improvement for Windows
+  - Reduces memory footprint and should fix memory errors 32-bit users
+    were having.
+. (kfsone) Fixed import command barfing if you didn't specify a filename
+. (kfsone) Added a hop-no display during "run" command,
+. (kfsone) Fixed a stupid command line problem with 'station' command,
++ Data: Path O'Gen, kfsone
+
+v6.5.0 Jan 06 2015
+. (sarbian/kfsone) Added "--pad-size" option to "run" command to
+        restrict results to given pad sizes.
+        e.g.
+          tdrun sol --hops 2 --pad-size ml?  (med, lrg or unk)
+          tdrun sol --hops 2 --pad-size m?   (med or unk)
+          tdrun sol --hops 2 --pad-size ?    (*only* unk)
+. (kfsone) Added "--pad-size" to buy, sell, local and rare commands.
+        e.g.
+          trade.py buy algae --near sol --ly 20 --pad ml?
+          trade.py buy algae --near sol --ly 20 --pad l
+        or find stations that need data:
+          trade.py local sol --ly 20 --pad ?
++ Data: kfsone, gazelle, maddavo, Christian Andersen, Jared Buntain,
+        Sebastian Pro, Stefan Zapf, nclavian
+
+v6.4.1 Jan 04 2015
+. (kfsone) Added the "station" sub-command for querying, adding, updating or
+        removing stations from the .db and .csv files. See
+           trade.py station --help
+        or the README.txt for more information.
+. (kfsone) Import reports stats on completion (so its more obvious it worked)
+. (kfsone) "NOTE" now indicates a line that can be hidden using "-q",
+. (kfsone) Deleted/Deprecated keys in .csv files are now warnings with "-i",
+. (kfsone) command names can now be partial, e.g. "loc" for "local",
+        "ra", "rar" or "rare" for "rares"
+. (kfsone) Show stationLS and pad size in rares display
+. (kfsone) Added "--stations" option to "nav" command to show station details,
+. (kfsone) Added "--reverse" to "rares" command, to make it easier to find
+        far away alternatives:
+        $ trade.py rare --near neto --ly 160 --reverse --limit 10
++ Data: kfsone, path o'gen, gazelle, maddavo,
+
+v6.4.0 Jan 01 2015
+. (kfsone) Added "rare" sub-command,
+. (kfsone) Added RareItem table,
+. (kfsone) Imported systems from EDStarCoord,
+. (kfsone) Added a LOT of stations,
+. (kfsone) Converted all SYSTEM names to upper case in the database,
++ Data: kfsone, gazelle
+
+v6.3.2 Dec 31 2014
+. (kfsone) Added experimental "upload-to-maddavo" (misc/madupload.py)
+. (kfsone) Improved the feedback from run when routes go wrong.
+. (kfsone) fixed "--link-ly" causing a 'TypeError' in various places,
+. (kfsone) "nav" now supports "--via"; destinations are processed in-order.
+. (kfsone) buy, sell, nav and local now have consistent presentation
+  of each station's distance from the star, labelled "StnLs", while
+  interstellar distances are labelled "DistLy".
+. (OpenSS) Added 'quick update' to scripts/trade.bat
++ Stations, data, etc: kfsone, gazelle, shirkan
+
+v6.3.1 Dec 28 2014
+. (kfsone) Removed '--supply' from "update" completely,
+. (kfsone) Improved the "--ls-penalty" from a flat line to a curve,
+   so really, stupidly, ridiculously distant stations (looking at you,
+   Alpha centauri) really have to be mind-blowing to show up.
+. (kfsone) "run" command output shows score of routes,
+. (kfsone) "misc/add-station" now has a "-u" option for updates,
+. (kfsone) "misc/add-station" no-longer writes to the csv file
+   (after adding stations do: trade.py export --table Station)
+. (kfsone) Fixed #111 import not rebuilding cache
+. (kfsone) "maddavo" plugin is now much smarter
+   - will try to download a smaller prices file,
+   - will check the first line of the file to see if it's an update
+     before downloading the whole thing :)
+. (kfsone) You can now use "--opt=help" to get help for plugins, e.g.
+   trade.py import --plugin=maddavo --opt=help
+. (kfsone) Added "--ls-penalty" ("--lsp") for biasing "run" calculations
+   in favor of shorter supercruise times.
++ Stations, Systems, data: kfsone, maddavo, gazelle, shirkan
+
+v6.3.0 Dec 23 2014
+. (OpenSS) Script for Windows users (see scripts/README.txt)!
+. (kfsone) Added support for pad sizes at stations,
+. (kfsone) Revamped output from "local", "buy", "sell" and "olddata".
+    - "--ages" is the default now (so the option is not needed),
+    - Added pad size display,
+    - Improved black market display,
+    - Changed '+' to '/' for consistency on station lines,
+. (bgol) Fixed weirdness with rangeCache
+. (bgol/kfsone) Fixed jump distances and performance of "nav" command
++ Stations, Data: kfsone
+
+v6.2.4 Dec 21 2014
+. (kfsone) Experimental "add-station" command in misc,
+. (kfsone) Added "--near" to olddata command,
+. (kfsone) Route calculation performance,
+. (kfsone) Added "Black Market" flag to station data,
+. (kfsone) Added Black Market indicators to "local" command,
+. (kfsone) Reorganized Ship and ShipVendor data (prices are ship based now),
+. (kfsone) Draft version of "jsonprices",
+. (gazelle) Auto-completion for bash users (see scripts/README.txt)
+. (gazelle) Nice overhaul of the csv export command
+. (kfsone) Fix for UTF-8 decoding error,
+. (kfsone) Rebuild cache before .prices file after downloading .csvs
+. (maddavo) Combat Stabilisers do exist
++ Systems, Stations, Data: Maddavo, Gazelle, Kfsone, many others
+
+v6.2.3 Dec 17 2014
+. (kfsone) "maddavo" import plugin:
+            . --opt=skipdl will use previous downloads
+            . added timestamp tracking/checking (data/maddavo.stamp)
+            . don't rebuild the cache if nothing new was downloaded,
+            . use "-v" to see stats on what updates you've downloaded,
+            . use "-q" to see less output when using the plugin
+. (kfsone) Changed "nav" to show station count with "-v" instead of "--stations"
+. (kfsone) Removed the StationLink table - cache builds should be MUCH faster
+
+v6.2.2 Dec 17 2014
+. (kfsone) Removed Alloys, Combat Stabilisers, Cotton and Plastics
+  [there was no entry for them anywhere in the price database]
+. (kfsone) Plugins can now have their own options
+    maddavo's plugin will take --option=syscsv and
+      --option=stncsv to download those .csv files
+. (kfsone) Added "--download" option to "import" to stop after downloading
+. (kfsone) Added "--url" option to "import", e.g.
+    trade.py import --download --url http://kfs.org/td/prices kfs.prices
+. (kfsone) "--check --mfd" should now work if you have 64-bit drivers
+. (kfsone) Added "--max-days" to run command
++ Stations, ships: kfsone
+
+v6.2.1 Dec 12 2014
+. (kfsone) Added "olddata" command
+. (kfsone) "run" (with -vv) will now show data age
+. (kfsone) Gamma 2.0.5 renamed "Slaves" category to "Slavery"
+. (kfsone) "sell" now has a --ages option too
+. (kfsone) "buy" and "sell" --near now checks the station/system too
+. (kfsone) "buy" now shows average cost if you specify --detail (-v)
+. (kfsone) "sell" now shows average value if you specify --detail (-v)
+. (kfsone) Fixed item name matching (--avoid)
+. (kfsone) Fixed use of via in "run"
+. (kfsone) Exposed cache.regeneratePricesFile()
+. (kfsone) Call regeneratePricesFile() after calling plugin.finish()
+. (kfsone) General code cleanup (removed buildLinks and loadTrades)
+. (kfsone) Added VisualStudio pyproj (great for performance analysis)
++ Stations, distances, ship data: gazelle, gulasch, kfsone, mseven
+
+v6.2.0 Dec 11 2014
+. (kfsone) Added plugin system for "import", added a maddavo plugin.
+. (kfsone) "-G" is now the default for "update"
+. (kfsone) "--capacity" and "--ly-per" are now required "run" arguments
+. (kfsone) "local --ly=0" now works as expected
+. (kfsone) Tell the user when we rebulid the cache (-q to silence)
+. (gulasch) Stations and distances
+. (kfsone) Mineral and Microbial are now in the correct order,
+. (kfsone) Big documentation cleanup,
+. (mhuges) Added '--stations' to 'nav' to show a station count,
+. (kfsone) Added '--ages' option to 'local' to show price data age,
+
+v6.1.8 Dec 09 2014
+. (kfsone) Huge performance improvement to "nav",
+. (kfsone) Performance improvement to "run",
+. (kfsone) #79 support for "--avoid" in the "nav" command,
+. (kfsone) Download counter to "import", use -q to silence it,
+. (kfsone) Fixed case-sensitivity matching station names that changed,
+. (kfsone) 60 new stations,
+. (kfsone) "update -G" now takes "-wx" and "-wy" arguments for setting the
+  position of the GUI window. Try -wx=-220 -wy=220,
+. (kfsone) Updated config.sh and tdupd to take advantage of -wx and -wy
+. (eggplant) More stations and distances,
+
+v6.1.7 Dec 07 2014
+. (kfsone) Added "scripts" directory with bash scripts
+  See scripts/README.txt
+. (kfsone) Allow bigger price differences for most costly items in the UI,
+  thanks to Bariri for the reports
+. (eggplant) More station data
+
+v6.1.6 Dec 06 2014
+. (gulasch) Station additions, corrections and distances
+. (kfsone) Added '--ages' option to "buy" command to show data age
+. (kfsone) Fix for line-numbers in .prices files sometimes being incorrect
+. (kfsone) Added "--start-jumps" (-s) option to "run" command which will
+  use actively trading stations within that number of jumps of your
+  specified system/station.
+. (kfsone) Added "--empty" to "run" command to tell it how far you can
+  jump when carrying zero cargo.
+. (kfsone) Include origin system in "local" command output (works well
+  with -v to list local stations)
+. (kfsone) ui_order is now specified in Item.csv rather than per-item
+  (Microbial Furnaces and Mineral Extractors should now be in UI order :)
+. (gazelle) More Station data and some distances
+. (eggplant) Made it possible to override the path to data files, etc,
+  by specifying a dataDir= argument to TradeEnv(). Default is still ./data
+
+v6.1.5 Dec 04 2014
+. (kfsone) "run" --from will now accept a System name
+. (kfsone) "update" GUI will now do some sanity checking on prices
+. (kfsone) "nav" with -vv will show direct distance left to destination
+. (kfsone) Minor speed improvements to "nav"
+. (kfsone) Startup optimizations,
+. (kfsone) "update" command now always exposes supply and demand,
+. (kfsone) "--supply" (-S) is now deprecated for "update" command,
+
+v6.1.4 Dec 01 2014
+. (kfsone) "updated.prices" will now contain line removals
+. (kfsone) 155 new systems from RedWizard
+. (Eggplant!) More Stations
+. (kfsone) Fix miscount of jumps when same-system hops were in a route,
+. (kfsone) run --jumps=0 now limits to same-system options
+. (kfsone) Fixed empty "Jump" lines in nav output for same-system hop
+
+v6.1.3 Nov 30 2014
+. (gazelle) More Station and Ship data
+. (kfsone) Changed UPDATE command to use places, check for stations, and to
+  generate a complete .prices fragment with timestamps for maddavo compat.
+. (kfsone) Fixed "run" and "nav" not understanding stations correctly
+. (kfsone) "avoid" now handles systems/stations discretely
+  - avoiding a station means you won't land there but you can
+    pass through the system,
+  - avoiding a system means you won't land there or fly thru it,
+. (kfsone) Improvements to name disambiguation:
+  When specifying a "place" name (system or station) you can resolve
+  any ambiguities with a new syntax:
+    @name
+      Means "this is a system name, don't conflict with stations"
+    /name or @/name
+      Means "this is a station, don't conflict with systems"
+    name/name  or  @name/name
+      Means "this is a system name and a station name"
+. (kfsone) Improved matching algorithm
+
+To see the difference, try:
+
+  trade.py local --ly 5 bea
+  trade.py local --ly 5 @bea
+  trade.py local --ly 5 @/bea
+  trade.py local --ly 5 prim/bea
+
+
+v6.1.2 Nov 28 2014
+. (kfsone) GUI now saves its updates as "updated.prices" so you can upload them
+. (kfsone) "run" now accepts a system OR station as the destination
+. (kfsone) System/Station name lookups are more friendly again
+. (kfsone) '-q' now silences "unknown ..." warnings when importing with "-i"
+. (gazelle) Improvements to .CSV file handling,
+. (gazelle) Additional stations, data cleanup, etc.
+. (kfsone) Fix for importing data without demand/supply
+. (kfsone) Adding support for stations with the same name in diff systems
+. (kfsone) Removed import-from-maddavo.py
+. (kfsone) Added support for URLs in "import" sub-command
+. (kfsone) Added "--maddavo" option to "import" to import maddavo's data
+e.g.
+  trade.py import -i http://kfs.org/td/prices
+or
+  trade.py import -i --maddavo
+
+
+v6.1.1 Nov 27 2014
+Optimization:
+. (kfsone) Removed support for old pre v5 .prices files
+. (kfsone) Streamlined demand/stock columns; these now only support:
+  - and 0  for "not available",
+  ?        for "who cares",
+  nn[?LMH] for number of units and unknown, low, medium or high
+(This makes the parser several times faster)
+. (kfsone) Made parsing .prices file several times faster
+
+v6.1.0 Nov 26 2014
+. (gazelle) Added "export" sub-command to generate csv files of the current database
+. (kfsone) Made the update-gui significantly more user friendly.
+. (kfsone) Handle cases where .prices file is missing, e.g. bootstrap
+
+v6.0.7 Nov 26 2014
+. (kfsone) Removed 'pill' options from local command
+. (kfsone) Friendly message instead of crash when local finds no stars
+. (kfsone) Added "--ignore-unkown" (-i) to "import"
+. (kfsone) "import" without a filename will now present an open file dialog
+API:
+. (kfsone) You can now have optional positional arguments in command lines
+
+v6.0.6 Nov 25 2014
+. (kfsone) Issue#63 Trade calculator was not seeing some non-trade jumps
+. (maddavo/kfsone) Import of ~20,000 systems
+. (kfsone) GUI tweaks
+. (kfsone) Station cleanup
+. (kfsone) Various new stations
+. (kfsone) Various minor bug fixes
+
+v6.0.5 Nov 22 2014 (w/Gamma 1)
+. (kfsone) Added "import" sub-command for loading 1+ stations from a file
+. (kfsone) Added "--height" (-H) option to update GUI
+. (kfsone) Added "--front" (-F) to keep the update gui infront of TD
+. (kfsone) Added Pilot's Federation/Jameson Memorial
+. (kfsone) Added '--ignore-unknown' option to buildcache
+
+v6.0.4 Nov 21 2014 (Beta 3.9.1)
+. (kfsone) Added "sell" command (find places to sell a specific item)
+. (kfsone) Reactive Armor changed to Reactive Armour
+. (kfsone) Added 'Chemical Waste'
+. (kfsone) Update GUI now consistently selects text on entering a cell
+. (kfsone) Update GUI now selects the first column of the first line on startup
+. (kfsone) Update GUI now supports up/down key inputs and has a default size
+. (kfsone) Issue#57 Fixed extra cache rebuilds after doing an 'update'
+. (kfsone) Changing .prices won't force a full rebuild of the cache
+. (kfsone) Better integrated update gui (improved startup times)
+. (kfsone) Added "--all" (-A) option to 'update -G' to show ALL items
+. (kfsone) (Update GUI) Set 'selling' and 'asking' to 0 to delete an item
+. (kfsone) Fixed "buy" command showing multiple hits for multi-station systems
+
+v6.0.3 Nov 21 2014
+. (kfsone) Added a GUI to the "update" sub-command, it's experimental:
+   - Use <tab>/<shift-tab> to cycle across rows,
+   - Use <enter> to drop to the first column of the next line,
+   - Scrolling is currently broken - you have to manually scroll. Ick.
+   - Use the "--exp" flag to indicate your understanding it is experimental.
+     e.g.: trade.py update --exp aulin
+. (kfsone) Fixed sqrt crash in buildCache.py in multi-station systems,
+. (kfsone) Fixed "local" command not showing stations when using "--detail",
+. (kfsone) Renamed "buildcache.py" to "cache.py"
+
+BETA 3:
+CAUTION: So many systems changed with the Beta 3 update that old prices files
+won't stand a chance of containing many valid systems. You may want to obtain
+a fresh file from one of the online sources, e.g.
+maddavo's site: http://www.davek.com.au/td/default.asp
+
+v6.0.2 Nov 20 2014
+. (maddavo) Imported additional systems
+. (kfsone) Big performance improvements
+. (kfsone) Added '--limit' to 'buy' sub-command
+. (kfsone) Stop forcing "Chu hub" to be "Chi hub" (Styx)
+. (kfsone) Improved speed of cache build
+
+v6.0.1 Nov 16 2014 (kfsone)
+. Added "--end" option to "run" for multiple-choice route termination.
+. Database refactor to improve runtime performance
+-- Some commands were taking upto 50s to load data from the cache.
+-- By reorganizing some data and adding better indexes, the run command,
+-- for example, went from 60s+ with a full prices file down to 3-4.
+. Assorted minor functionality and perf improvements,
+. Various bug fixes
+
+NOTE: Rebuilding the cache can now take 2-8 seconds, but you only
+pay this price on the first usage after you import a new .prices file
+or update a station.
+
+Developers:
+. TradeDB.buildLinks now reads from the database instead of building
+the link table itself. Reduced execution time from 600+ms to 30ms.
+. TradeCalc.getBestHops will lazily load trades for the stations it
+is considering, so you do not need to call loadTrades, but you do
+still need to clal buildLinks at this time.
+. TradeDB now provides loadStationTrades([stationIDs]) which will
+load profitable trades *from* the specified list of stationIDs.
+. To test for a station not having loaded its trades:
+    if stn.tradingWith is None:
+        # Not loaded
+
+v6.0.0 Nov 09 2014 (kfsone)
+. Major overhaul of command line interface and the internal command API.
+
+User Facing:
+- Numerous significant performance improvements, esp loading times,
+- Improved command-line feedback in assorted error conditions,
+- Various changes to support incoming data changes such as renaming
+ of items, categories, stations, etc,
+- Improved robustness around a lot of rough-edge cases,
+- "common" args (-v, -w) now come after the command (e.g. update -v),
+- "-q" has more effect (try 'nav' with -q -q),
+- "update" has better feedback on errors,
+- "update" will save your update as "prices.last" if there is an error
+  (weren't you tired of losing all your changes to a typo?)
+- "nav" command overhauled,
+- "local" command overhauled,
+
+Developer:
+- Sub-commands are now implemented in individual modules in the commands/
+ folder and suffixed _cmd (e.g. commands/buy_cmd.py)
+ See also commands/TEMPLATE.py for command boilerplate.
+ See commands/__init__.py for the command list,
+- Added "TradeEnv" container for transporting settings and arguments,
+- Added "CommandEnv" for parsing command line and populating a TradeEnv
+ based on the command-line origins (step towards user settings),
+- sub-commands are now split into a "run" and "render" phase so that
+ developers can leverage their functionality without having to parse
+ textual output. See "commands/buy_cmd.py" for an example,
+- Added "nose" based Unit Tests,
+- Made "buildcache" a trade.py sub-command rather than a standalone
+ tool. Use this if changes you make break your .db and for some reason
+ trade.py won't boot-strap itself. ('trade.py buildcache')
+TODO:
+. Finish implementing tests,
+. Make "update" have an option that just takes a filename to allow
+ people to import data from elsewhere more easily,
+. Document the command API in TEMPLATE.py
+
+v5.0.1 Nov 4/2014
+. (kfsone) Issue #49 Errors in Ambiguity Error
+. (kfsone) Issue #51 L and ? items weren't honoring qty limits
+. (kfsone) Issue #50 Interaction between -0 and demand for a sold item
+. (Smacker65) Beta 3 Systems with markets
+
+v5.0.0 Oct 31/2014
+. (kfsone) Initial Beta 3 changes
+ - Improved the "corrections" system which facilitates changing names
+   between versions, you can now "correct" System, Station, Category
+   and Item names;
+ - Renamed "Drugs" to "Legal Drugs", guess we need to add "Illegal Drugs"
+ - Renamed some obvious items (Hel-Static Furnaces -> Microbial Furnaces),
+ - Added some items that looked new (but could be renames),
+ - Renamed Hopkins Hangar -> Cori Terminal
+
+v4.7.0 Oct 26/2014
+. (kfsone) Added "buy" sub-command for looking up sales of an item
+
+v4.6.3 Oct 26/2014
+. (kfsone) Fixed distance-related breakage in 4.6.2
+. (kfsone) Improved error feedback while processing .prices file
+
+v4.6.2 Oct 25/2014
+. (kfsone) Added support for self-correcting star/station name changes,
+. (kfsone) Added name corrections for maddavo's current TradeDangerous.prices,
+. (kfsone) Assorted minor API changes,
+. (kfsone) Minor startup optimization pass
+
+v4.6.1 Oct 25/2014
+. (kfsone) Added "--supply" (-S) which shows supply (demand and stock) fields when editing,
+. (kfsone) Added "--timestamps" (-T) which shows timestamp field when editing,
+. (kfsone) Added "--force-na" (-0) which replaces 'unk' values with 'n/a' (use with care),
+. (kfsone) Deprecated "--all" and "--zero",
+. (kfsone) Minor fixes to new .prices format
+
+v4.6.0 Oct 24/2014
+. (kfsone) New extended .prices format:
+  <item name> <sell> <buy> <demand> <stock> [<time>]
+  Demand/stock can be:
+   unk     :-  "unknown" - treat as though always available
+   n/a     :-  "not available" - ignore in trade calcs
+   0       :-  alias for "n/a"
+  or the number of units followed by L, M or H, e.g.
+   10L     :- 10 units at Low
+   500M    :- 500 units at Medium
+   9000H   :- 9000 units at High
+  Note that the time has moved to the end of the line.
+  When updating data, you can either remove the time and have it
+  default to 'now' or you can explicitly write the word now.
+. (smacker65) Couple of station name corrections
+. (kfsone) Better feedback when price data could not be found
+. (kfsone) .prices wiki page
+. (smacker65) More star data and corrections
+. (gazelle) Fix for "--zero" and, e.g., "-1L0"
+
+v4.5.1 Oct 20/2014
+. (kfsone) Added --dir (-C) command line for specifying which directory you
+  want trade.py to look in for it's files.
+. (kfsone) trade.py will now default to trying to look for files relative
+  to where the "trade.py" script was called from. So if you run
+  "c:\tradedangerous\trade.py" it will look for the data directory as
+  "c:\tradedangerous\data\" (Issue #39)
+
+v4.5.0 Oct 20/2014
+. (Smacker65/Community) Smacker brings the star database up to 567 systems.
+
+v4.4.0 Oct 19/2014
+. (Gazelle/Community) Merged Gazelle's update with community sources Star/Station
+  data. Thanks to Gazelle, Smacker, RedWizzard, Haringer, Wolverine.
+  It's only data but it's a big update and a lot of work went into it :)
+
+v4.3.0 Oct 17/2014
+. (gazelle) Added "--zero" option to "update --all" which makes the default
+   value for demand/stock levels "0" instead of "-1". (-1 means 'unknown'.
+   Use this option if you are editing timestamps and stock levels and all
+   those '-'s get in your way)
+. (gazelle) Moved Star, System, etc data out of ".sql" file and into
+   per-table ".csv" files. This should make it much easier for people to
+   share and synchronize data and make it less daunting for people to
+   maintain their data files. Great work, Gazelle!
+
+v4.2.3 Oct 17/2014
+. (ShadowGar, Smacker65) Imported Harbinger and RedWizzard system data,
+  also added tracking of where data has come from. Thanks also to Wolverine
+  for his work identifying data sources.
+
+v4.2.2 Oct 16/2014
+. (kfsone) user-friendlified errors generated by TD
+. (kfsone) gave "update" sub-command a "--npp" option (notepad++)
+. (kfsone) gave "update" sub-command a "--vim" option (vim editor)
+
+v4.2.1 Oct 15/2014
+. (ShadowGar) Added more Stars and corrected HAGALAZ
+. (kfsone) sort items by name rather than id when building .prices files
+. (kfsone) improved the instructional comments in .prices files
+. (kfsone) Big README.txt cleanup
+
+v4.2.0 Oct 15/2014
+. (Smacker65) Added "local" sub-command (lists systems within jump range of you)
+
+v4.1.0 Oct 15/2014
+. (gazelle) ".prices" file is no-longer included in the git repository,
+  instead you'll need to download one or populate your own
+. (gazelle) added the "--all" option to the "update" sub-command,
+. (kfsone) fixed problems caused when the .prices file is missing and there is
+  limited or no data available - user should get better feedback now.
+
+v4.0.4 Oct 15/2014
+. (kfsone) Issue #20 Improved fuzzy-matching of system/star names
+. (gazelle) Fixed "Lacaille Prospect"
+. (kfsone) "trade.py" is now executable by default on Linux/MacOS
+
+v4.0.3 Oct 12/2014
+. (kfsone) Issue #17 "--avoid gold" conflicted with "Goldstein Mines"
+. (Smacker65) Issue #13 "Nelson Port" was listed as "Nelson Point"
+. (kfsone) Issue #12 "-w" was failing because Rigel has no links
+. (kfsone) Issue #11 Partial name matches weren't generating an ambiguity (e.g. 'ra' or 'ross')
+. (kfsone) Issue #19 Beryllium and Gallium were incorrectly identified as Minerals
+
+v4.0.2 Oct 06/2014
+. (ShadowGar) More systems/stations from
+
+v4.0.1 Oct 06/2014
+. (kfsone)  Improved "--sublime" option, now supports Sublime Text 2 and works under Mac/Lin
+
+v4.0 Oct 05/2014
+. (ShadowGar) Updated to Beta 2 - All credit to ShadowGar
+
+v3.9 Sep 21/2014
+  NOTE: '--detail' (-v) is now a common option, i.e. must come before sub-command
+    trade.py cleanup -v    << won't work any more
+    trade.py -v cleanup    << new order
+  Added 'nav' sub-command for navigation assistance:
+    trade.py nav [--ship name [--full]] [--ly-per] from to
+  Added '--quiet' (-q) common option for reducing level of detail, e.g.
+    trade.py -q cleanup
+
+v3.8 Sep 17/2014
+  Fix for Issue #7: --avoid not working with systems that have no stations,
+  Additional help text,
+  General cleanup,
+  Running "emdn-tap.py -v" will show price changes,
+
+v3.7 Sep 15/2014
+  Fixed excessive CPU usage in emdn-tap.py (ty, jojje)
+  Added 'cleanup' command to help remove bad data from emdn
+    EMDN isn't foolproof, and sometimes receives invalid or
+    deliberately poisoned data. The best way to detect this
+    is currently to look for prices that are somewhat older
+    than the rest of the information received for the same
+    station. This command checks for those records and
+    removes them.
+  emdn-tap now tries harder to honor commit intervals.
+API Changes:
+  makeSubParser now takes an epilog
+
+v3.6 Sep 12/2014
+  Added DB support for tracking item stock/demand levels,
+  TradeCalc will now factor stock levels when present,
+  Minor performance/memory tweak
+  emdn-tap:
+    Now accepts --warn-to argument,
+    Applies filters to what data it will accept,
+    Records item stock/demand levels to the DB
+
+v3.5 Sep 06/2014
+  The emdn-tap tool now uses the compressed JSON stream rather than
+  the CSV stream - saves you bandwidth.
+
+v3.4 Sep 05/2014
+  Added emdn-tap.py script which pulls data from EMDN network.
+  "--via" now accepts multiple and/or comma separated stations so you can plan
+  a very specific shopping-list route.
+
+v3.3 Sep 04/2014
+  Updated README to include sub-commands,
+  Fixed a 'file not found' error running trade.py the first time with no arguments,
+  Made specific CATEGORY/Item lookups possible (e.g. "Metals/Gold"),
+  Added games internal names for items to the database,
+  Enabled internal-name lookups for items (e.g. 'heliostaticfurnaces'),
+  Fixed a bug where two names for the same thing caused ambiguity (duh!),
+API changes:
+  TradeDB.listSearch() now also takes a val() argument,
+  Added a simple EMDN access module (emdn directory),
+  Cleaned up various __repr__ functions now I know what __repr__ is for,
+
+v3.2 Sep 03/2014
+  Internal cleanup of how we process sub-commands
+
+v3.1 Sep 01/2014
+  Introduced sub-commands:
+  - "run" command provides the old default behavior of calculating a run,
+  - "update" command provides ways to update price database easily,
+
+v3.0 Aug 30/2014
+  Major overhaul. No-longer requires Microsoft Access DB. To update prices,
+  edit the data/TradeDangerous.prices file. When you next run the tool, new
+  data will be loaded automatically.
+  Cleaned up code, normalized the way I name functions, etc.
+  Added more ship data, etc.

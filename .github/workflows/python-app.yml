@@ -1,0 +1,129 @@
+# This workflow will install Python dependencies, run tests and lint with a single version of Python
+# For more information see: https://docs.github.com/en/actions/guides/building-and-testing-python
+
+name: Python application
+
+on:
+  push:
+    branches: [ release/v1 ]
+  pull_request:
+    branches: [ release/v1 ]
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}-latest
+    strategy:
+      matrix:
+        os:
+          - Ubuntu
+          - Windows
+          - MacOS
+        py:
+          - "3.12"
+          - "3.11"
+          - "3.10"
+          - "3.9"
+          - "3.8"
+        exclude:
+          # It's unlikely people will be using 3.8 at this point on Win or Mac
+          - os: Windows
+            py: "3.8"
+          - os: MacOS
+            py: "3.8"
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.py }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.py }}
+
+    - name: Cache python packages
+      uses: actions/cache@v4.0.2
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('requirements*.txt') }}
+        restore-keys: ${{ runner.os }}-pip-
+
+    - name: Cache tox results
+      uses: actions/cache@v4.0.2
+      with:
+        path: .tox
+        key: ${{ runner.os }}-${{ matrix.py }}-tox-${{ hashFiles('tox.ini') }}-${{ hashFiles('requirements*.txt') }}
+        restore-keys: ${{ runner.os }}-${{ matrix.py }}-tox-
+    
+    - name: Install dependencies
+      run: |
+        python3 -m pip install -q --upgrade pip
+        python3 -m pip install -q -r requirements-dev.txt
+    
+    - name: Test with tox
+      # This will run flake8 tests (which will fail quickly) alongside running
+      # pylint for a deeper inspect and running unit tests for all available
+      # python interpreters in parallel
+      env:
+        TOX_PARALLEL_NO_SPINNER: 1
+      run: |
+        tox --parallel
+  
+  pypi-publish:
+    name: Upload release to PyPI
+    # Don't try to publish except when this is a push onto the main branch of the master repos.
+    if: github.repository == 'eyeonus/Trade-Dangerous' && github.event_name == 'push' && github.ref == 'refs/heads/release/v1'
+    needs: test
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/tradedangerous
+    permissions:
+      id-token: write  # IMPORTANT: this permission is mandatory for trusted publishing
+      contents: write
+    steps:
+    # retrieve your distributions here
+    - uses: actions/checkout@v4
+      with:
+          fetch-depth: 0
+    
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.10"
+    
+    - name: Install dependencies
+      run: |
+        python3 -m pip install -q --upgrade pip
+        python3 -m pip install -q -r requirements-publish.txt
+    
+    - name: Configure git
+      run: |
+        git config --global user.name "semantic-release (via GitHub Actions)"
+        git config --global user.email "semantic-release@gh"
+    
+    # This action uses Python Semantic Release v8
+    - name: Python Semantic Release
+      id: release
+      uses: python-semantic-release/python-semantic-release@v8.0.0
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Build a binary wheel and a source tarball
+      run: python3 -m build
+    
+    - name: Store the distribution packages
+      uses: actions/upload-artifact@v3
+      with:
+        name: python-package-distributions
+        path: dist/
+    
+    - name: Publish package distributions to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      # NOTE: DO NOT wrap the conditional in ${{ }} as it will always evaluate to true.
+      # See https://github.com/actions/runner/issues/1173
+      if: steps.release.outputs.released == 'true'
+    
+    - name: Publish package distributions to GitHub Releases
+      uses: python-semantic-release/upload-to-gh-release@main
+      if: steps.release.outputs.released == 'true'
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}

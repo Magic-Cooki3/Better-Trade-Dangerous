@@ -1,0 +1,4 @@
+[
+  "ALTER TABLE Station ADD COLUMN IF NOT EXISTS carrier_docking_access TEXT",
+  "UPDATE Station SET carrier_docking_access = '?' WHERE carrier_docking_access IS NULL"
+]

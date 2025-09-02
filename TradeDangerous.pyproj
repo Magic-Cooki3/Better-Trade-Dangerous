@@ -1,0 +1,95 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" DefaultTargets="Build">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{d36f3ae1-f917-41e9-a3f9-61cfe02c5f0f}</ProjectGuid>
+    <ProjectHome />
+    <StartupFile>trade.py</StartupFile>
+    <SearchPath />
+    <WorkingDirectory>.</WorkingDirectory>
+    <OutputPath>.</OutputPath>
+    <ProjectTypeGuids>{888888a0-9f3d-457c-b088-3a5042f75d52}</ProjectTypeGuids>
+    <LaunchProvider>Standard Python launcher</LaunchProvider>
+    <InterpreterId />
+    <InterpreterVersion />
+    <CommandLineArguments>run -vv --progress --empty=82 --cap=212 --jumps=4 --cr=2153796 --from="lft78/coye" --hops 6 --to jamesonmem --ls-m=8000 --sup=10000 --pad L --ly 12 --prune-hop=3 --prune-sc=40</CommandLineArguments>
+    <EnableNativeCodeDebugging>False</EnableNativeCodeDebugging>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'" />
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'" />
+  <PropertyGroup>
+    <VisualStudioVersion Condition=" '$(VisualStudioVersion)' == '' ">10.0</VisualStudioVersion>
+    <PtvsTargetsFile>$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets</PtvsTargetsFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="cache.py" />
+    <Compile Include="commands\buildcache_cmd.py" />
+    <Compile Include="commands\buy_cmd.py" />
+    <Compile Include="commands\commandenv.py" />
+    <Compile Include="commands\exceptions.py" />
+    <Compile Include="commands\export_cmd.py" />
+    <Compile Include="commands\import_cmd.py" />
+    <Compile Include="commands\local_cmd.py" />
+    <Compile Include="commands\nav_cmd.py" />
+    <Compile Include="commands\olddata_cmd.py" />
+    <Compile Include="commands\parsing.py" />
+    <Compile Include="commands\rares_cmd.py" />
+    <Compile Include="commands\run_cmd.py" />
+    <Compile Include="commands\sell_cmd.py" />
+    <Compile Include="commands\station_cmd.py" />
+    <Compile Include="commands\test_commands.py" />
+    <Compile Include="commands\update_cmd.py" />
+    <Compile Include="commands\update_gui.py" />
+    <Compile Include="commands\__init__.py" />
+    <Compile Include="corrections.py" />
+    <Compile Include="csvexport.py" />
+    <Compile Include="formatting.py" />
+    <Compile Include="mfd\saitek\directoutput.py" />
+    <Compile Include="mfd\saitek\x52pro.py" />
+    <Compile Include="mfd\saitek\__init__.py" />
+    <Compile Include="mfd\__init__.py" />
+    <Compile Include="misc\checkpricebounds.py" />
+    <Compile Include="misc\clipboard.py" />
+    <Compile Include="misc\derp-sentinel.py" />
+    <Compile Include="misc\diff-system-csvs.py" />
+    <Compile Include="misc\eddb.py" />
+    <Compile Include="misc\eddn.py" />
+    <Compile Include="misc\edsc.py" />
+    <Compile Include="misc\importeddbstats.py" />
+    <Compile Include="misc\madupload.py" />
+    <Compile Include="misc\prices-json-exp.py" />
+    <Compile Include="misc\progress.py" />
+    <Compile Include="plugins\maddavo_plug.py" />
+    <Compile Include="plugins\__init__.py" />
+    <Compile Include="prices.py" />
+    <Compile Include="trade.py" />
+    <Compile Include="tradecalc.py" />
+    <Compile Include="tradedb.py" />
+    <Compile Include="tradeenv.py" />
+    <Compile Include="tradeexcept.py" />
+    <Compile Include="transfers.py" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="CHANGES.txt" />
+    <Content Include="data\Added.csv" />
+    <Content Include="data\Category.csv" />
+    <Content Include="data\Item.csv" />
+    <Content Include="data\Ship.csv" />
+    <Content Include="data\ShipVendor.csv" />
+    <Content Include="data\Station.csv" />
+    <Content Include="data\System.csv" />
+    <Content Include="data\TradeDangerous.sql" />
+    <Content Include="README.md" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="commands" />
+    <Folder Include="data" />
+    <Folder Include="mfd" />
+    <Folder Include="mfd\saitek" />
+    <Folder Include="misc\" />
+    <Folder Include="plugins\" />
+  </ItemGroup>
+  <Import Project="$(PtvsTargetsFile)" Condition="Exists($(PtvsTargetsFile))" />
+  <Import Project="$(MSBuildToolsPath)\Microsoft.Common.targets" Condition="!Exists($(PtvsTargetsFile))" />
+</Project>

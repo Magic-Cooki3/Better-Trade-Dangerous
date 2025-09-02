@@ -388,11 +388,7 @@ class ImportPlugin(plugins.ImportPluginBase):
             self.options["force"] = True
         
         # Select which options will be updated
-        if self.getOption("listings"):
-            self.options["item"] = True
-            self.options["station"] = True
-
-        if self.getOption("listings_live"):
+        if self.getOption("listings") or self.getOption("listings_live"):
             self.options["item"] = True
             self.options["station"] = True
         

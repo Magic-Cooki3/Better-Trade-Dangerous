@@ -121,6 +121,14 @@ def load_commands() -> Dict[str, CommandMeta]:
         switches = _flatten_args(getattr(module, "switches", []))
         metas[cmd_name] = CommandMeta(cmd_name, help_text, arguments, switches)
     # Add a convenience action for updating/rebuilding the DB via eddblink plugin
+    metas["Update All (DB + Live Listings)"] = CommandMeta(
+        name="import",
+        help="Run DB rebuild then live listings (eddblink)",
+        arguments=[],
+        switches=[],
+        # Preview will be customized to show both steps; run logic chains two background runs
+        fixed_args=["import", "-P", "eddblink", "-O", "clean,all,skipvend,force"],
+    )
     metas["Update/Rebuild DB"] = CommandMeta(
         name="import",
         help="Convenience: import with eddblink (clean/all/skipvend/force)",
@@ -248,12 +256,55 @@ class TdGuiApp(tk.Tk):
         except Exception:
             pass
 
+    # ----- Platform helpers -----
+    def _is_windows(self) -> bool:
+        try:
+            return sys.platform.startswith('win')
+        except Exception:
+            return False
+
+    def _is_macos(self) -> bool:
+        try:
+            return sys.platform == 'darwin'
+        except Exception:
+            return False
+
+    def _reveal_in_file_manager(self, path: str):
+        """Reveal a file in the platform's file manager (Explorer/Finder) or
+        open its folder on Linux. Soft-fail if not supported.
+        """
+        try:
+            if not path:
+                return
+            if self._is_windows():
+                try:
+                    # Select the file in Explorer when possible
+                    subprocess.Popen(['explorer', '/select,', os.path.normpath(path)])
+                except Exception:
+                    # Fallback: open the parent directory
+                    os.startfile(os.path.dirname(path))  # type: ignore[attr-defined]
+                return
+            if self._is_macos():
+                try:
+                    subprocess.Popen(['open', '-R', path])
+                except Exception:
+                    subprocess.Popen(['open', os.path.dirname(path)])
+                return
+            # Linux/BSD: try xdg-open
+            try:
+                subprocess.Popen(['xdg-open', os.path.dirname(path)])
+            except Exception:
+                pass
+        except Exception:
+            pass
+
     def _ordered_command_labels(self) -> List[str]:
         """Return command labels with preferred presets first.
         Order: Update/Rebuild DB, Update Live Listings, EDDN Live presets, Spansh import, then the rest sorted.
         """
         keys = list(self.cmd_metas.keys())
         preferred = [
+            "Update All (DB + Live Listings)",
             "Update/Rebuild DB",
             "Update Live Listings",
             "EDDN Live (Carriers)",
@@ -268,17 +319,32 @@ class TdGuiApp(tk.Tk):
     def _build_topbar(self):
         top = ttk.Frame(self)
         top.grid(row=0, column=0, sticky="ew", padx=8, pady=(8, 2))
+        # Keep a flexible spacer to the right; combobox stays compact
+        top.columnconfigure(1, weight=0)
         top.columnconfigure(2, weight=1)
 
         ttk.Label(top, text="Command:").grid(row=0, column=0, sticky="w", padx=(0,6))
         self.cmd_var = tk.StringVar()
+        # Compute a width that fits common longest labels (with padding),
+        # then clamp to a compact range so it doesn't dominate the toolbar.
+        _labels = self._ordered_command_labels()
+        try:
+            _font = tkfont.nametofont("TkDefaultFont")
+            _max_px = max((_font.measure(s) for s in _labels), default=160)
+            _avg_px = max(1, _font.measure("0"))
+            _pad_px = _font.measure("   ") + 24  # entry padding + dropdown arrow
+            _chars = int((_max_px + _pad_px) / _avg_px)
+            _chars = min(max(24, _chars), 34)
+        except Exception:
+            _chars = 30
         self.cmd_combo = ttk.Combobox(
             top,
             textvariable=self.cmd_var,
-            values=self._ordered_command_labels(),
+            values=_labels,
             state="readonly",
-            width=20,
+            width=_chars,
         )
+        # Do not expand horizontally; keep left-aligned
         self.cmd_combo.grid(row=0, column=1, sticky="w")
         self.cmd_combo.bind("<<ComboboxSelected>>", lambda e: self._on_command_change())
         # Spacer stretches
@@ -407,7 +473,9 @@ class TdGuiApp(tk.Tk):
         self.status_row = ttk.Frame(out_tab)
         self.status_row.grid(row=0, column=0, sticky="ew")
         self.status_row.columnconfigure(0, weight=0)
-        self.status_row.columnconfigure(1, weight=1)
+        self.status_row.columnconfigure(1, weight=0)
+        # Column 2 stretches to fit progress bar
+        self.status_row.columnconfigure(2, weight=1)
         # Status line above output
         self.run_status_var = tk.StringVar(value="")
         # Stop button (red with white text) to the left of the timer
@@ -420,6 +488,19 @@ class TdGuiApp(tk.Tk):
         # Will be gridded dynamically while a command is running
         self.run_status = ttk.Label(self.status_row, textvariable=self.run_status_var)
         self.run_status.grid(row=0, column=1, sticky="w", padx=4, pady=(2,2))
+        # Indeterminate progress bar for foreground runs (hidden by default)
+        self.run_progress = ttk.Progressbar(
+            self.status_row,
+            mode="indeterminate",
+            style="Loading.Horizontal.TProgressbar",
+            length=180,
+        )
+        # Place but hide until a run starts
+        try:
+            self.run_progress.grid(row=0, column=2, sticky="ew", padx=(6,6), pady=(2,2))
+            self.run_progress.grid_remove()
+        except Exception:
+            pass
         # Vertical splitter exactly between route cards and console output
         self.out_split = ttk.Panedwindow(out_tab, orient=tk.VERTICAL, style="OutSplit.TPanedwindow")
         self.out_split.grid(row=1, column=0, sticky="nsew")
@@ -493,7 +574,7 @@ class TdGuiApp(tk.Tk):
     def _build_global_options(self):
         bottom = ttk.LabelFrame(self, text="Global Options")
         bottom.grid(row=3, column=0, sticky="ew", padx=8, pady=(0,8))
-        for i in range(9):
+        for i in range(13):
             bottom.columnconfigure(i, weight=1 if i in (1,3,5) else 0)
 
         # CWD
@@ -542,6 +623,27 @@ class TdGuiApp(tk.Tk):
         ttk.Button(bottom, text="Export Settings", command=self._export_settings).grid(row=2, column=9, sticky="e", padx=(0,6))
         ttk.Button(bottom, text="Import Settings", command=self._import_settings).grid(row=2, column=10, sticky="e")
 
+        # Auto-Backup (filename) controls
+        ttk.Label(bottom, text="Auto-Backup:").grid(row=0, column=9, sticky="e")
+        self.autobackup_var = tk.BooleanVar(value=False)
+        cb_ab = ttk.Checkbutton(bottom, variable=self.autobackup_var, command=self._on_toggle_autobackup)
+        cb_ab.grid(row=0, column=10, sticky="w")
+        self.autobackup_name_var = tk.StringVar(value="")
+        self.autobackup_entry = ttk.Entry(bottom, textvariable=self.autobackup_name_var, width=18)
+        self.autobackup_entry.grid(row=0, column=11, sticky="w", padx=(4,0))
+        try:
+            self.autobackup_entry.configure(insertbackground=self.colors["fg"])
+        except Exception:
+            pass
+        # Disabled by default unless checkbox is on
+        try:
+            self.autobackup_entry.state(["disabled"])  # type: ignore[attr-defined]
+        except Exception:
+            try:
+                self.autobackup_entry.configure(state='disabled')
+            except Exception:
+                pass
+
         # Trace to update preview when globals change
         self.cwd_var.trace_add("write", lambda *_: self._update_preview())
         self.db_var.trace_add("write", lambda *_: self._update_preview())
@@ -554,6 +656,8 @@ class TdGuiApp(tk.Tk):
         self.detail_var.trace_add("write", lambda *_: self._save_prefs())
         self.quiet_var.trace_add("write", lambda *_: self._save_prefs())
         self.debug_var.trace_add("write", lambda *_: self._save_prefs())
+        self.autobackup_var.trace_add("write", lambda *_: self._save_prefs())
+        self.autobackup_name_var.trace_add("write", lambda *_: self._save_prefs())
 
     def _init_sashes(self):
         # Set initial sash positions once, unless the user already moved them
@@ -804,10 +908,34 @@ class TdGuiApp(tk.Tk):
 
         return parts
 
+    def _build_args_from_base(self, base: List[str]) -> List[str]:
+        """Build CLI args starting from a provided base (e.g., a preset),
+        appending global options (-C/--db/-L and -v/-q/-w)."""
+        parts = list(base)
+        if self.cwd_var.get().strip():
+            parts.extend(["-C", self.cwd_var.get().strip()])
+        if self.db_var.get().strip():
+            parts.extend(["--db", self.db_var.get().strip()])
+        if self.linkly_var.get().strip():
+            parts.extend(["-L", self.linkly_var.get().strip()])
+        parts.extend(["-v"] * int(self.detail_var.get()))
+        parts.extend(["-q"] * int(self.quiet_var.get()))
+        parts.extend(["-w"] * int(self.debug_var.get()))
+        return parts
+
     def _update_preview(self):
-        args = self._build_args()
-        # Render a shell-like preview
-        cmd = [sys.executable, self.trade_py] + args
+        label = self.cmd_var.get()
+        # Special combined preset: show both steps in preview
+        if label == "Update All (DB + Live Listings)":
+            a1 = self._build_args_from_base(["import", "-P", "eddblink", "-O", "clean,all,skipvend,force"])
+            a2 = self._build_args_from_base(["import", "-P", "eddblink", "-O", "listings_live"])
+            cmd1 = [sys.executable, self.trade_py] + a1
+            cmd2 = [sys.executable, self.trade_py] + a2
+            parts = cmd1 + ["&&"] + cmd2
+        else:
+            args = self._build_args()
+            # Render a shell-like preview
+            parts = [sys.executable, self.trade_py] + args
         def quote_double(s: str) -> str:
             s = str(s)
             if s is None:
@@ -818,7 +946,7 @@ class TdGuiApp(tk.Tk):
             if needs_quotes:
                 return '"' + s.replace('"', '\\"') + '"'
             return s
-        self.preview_var.set(" ".join(quote_double(p) for p in cmd))
+        self.preview_var.set(" ".join(quote_double(p) for p in parts))
 
     # ----- Layout helpers -----
     def _on_sel_inner_configure(self, event=None):
@@ -843,6 +971,34 @@ class TdGuiApp(tk.Tk):
         self._start_timer()
         self._clear_routes()
         self._stop_requested = False
+        # Validate auto-backup name if enabled
+        try:
+            if getattr(self, 'autobackup_var', None) and self.autobackup_var.get():
+                if self._ensure_backup_name() is None:
+                    return
+        except Exception:
+            pass
+        label = self.cmd_var.get()
+        # Special combined preset: run DB rebuild followed by live listings
+        if label == "Update All (DB + Live Listings)":
+            base1 = ["import", "-P", "eddblink", "-O", "clean,all,skipvend,force"]
+            base2 = ["import", "-P", "eddblink", "-O", "listings_live"]
+            args1 = [sys.executable, self.trade_py] + self._build_args_from_base(base1)
+            args2 = [sys.executable, self.trade_py] + self._build_args_from_base(base2)
+
+            # Safeguard: preempt background sessions based on first (DB-heavy) task
+            preempted = []
+            try:
+                if self._requires_db_exclusive(args1):
+                    preempted = self._preempt_background_sessions()
+            except Exception:
+                preempted = []
+
+            title1 = self._background_title_for_args(args1) or "EDDB Link Import"
+            title2 = self._background_title_for_args(args2) or "EDDB Link (Live Listings)"
+            self._run_background(args1, title1, resume_after=preempted, chain=[{"args": args2, "title": title2}])
+            return
+
         args = [sys.executable, self.trade_py] + self._build_args()
 
         # Safeguard: pause/stop background writer tabs before DB‑exclusive tasks
@@ -929,6 +1085,11 @@ class TdGuiApp(tk.Tk):
             self.after(0, self._process_routes_from_output)
             # Persist the latest output for this command so it restores on tab switch
             self.after(0, self._save_prefs)
+            # Auto-backup settings shortly after UI populates
+            try:
+                self.after(750, self._auto_backup_if_enabled)
+            except Exception:
+                pass
             # Resume any preempted background sessions
             if preempted_sessions:
                 self.after(0, lambda lst=preempted_sessions: self._resume_preempted_list(lst))
@@ -1009,7 +1170,7 @@ class TdGuiApp(tk.Tk):
         except Exception:
             return None
 
-    def _run_background(self, args: List[str], title_hint: str, resume_after: Optional[List[Dict[str, Any]]] = None):
+    def _run_background(self, args: List[str], title_hint: str, resume_after: Optional[List[Dict[str, Any]]] = None, chain: Optional[List[Dict[str, Any]]] = None):
         # Build session tab
         self._bg_counter += 1
 
@@ -1022,11 +1183,24 @@ class TdGuiApp(tk.Tk):
         status_row = ttk.Frame(tab)
         status_row.grid(row=0, column=0, sticky="ew")
         status_row.columnconfigure(0, weight=0)
-        status_row.columnconfigure(1, weight=1)
-        status_var = tk.StringVar(value="Running (00:00:00)")
+        status_row.columnconfigure(1, weight=0)
+        status_row.columnconfigure(2, weight=1)
+        status_var = tk.StringVar(value="Running (00:00)")
         stop_btn = ttk.Button(status_row, text="Stop", style="Stop.TButton")
         stop_btn.grid(row=0, column=0, sticky="w", padx=(4,6), pady=(2,2))
         ttk.Label(status_row, textvariable=status_var).grid(row=0, column=1, sticky="w", padx=4, pady=(2,2))
+        # Indeterminate progress bar for background session
+        bg_progress = ttk.Progressbar(
+            status_row,
+            mode="indeterminate",
+            style="Loading.Horizontal.TProgressbar",
+            length=180,
+        )
+        try:
+            bg_progress.grid(row=0, column=2, sticky="ew", padx=(6,6), pady=(2,2))
+            bg_progress.start(10)
+        except Exception:
+            pass
 
         # Output area tails a log file
         output = ScrolledText(tab, wrap="word")
@@ -1071,19 +1245,82 @@ class TdGuiApp(tk.Tk):
 
         # Tail the logfile in a thread
         stop_flag = {"stopped": False}
+        # Track a short status snippet to show next to the timer
+        phase = {"text": ""}
 
         def tailer():
             try:
                 with open(logfile, 'r', encoding='utf-8', errors='replace') as fh:
                     fh.seek(0, os.SEEK_END)
                     self._init_stream_state(output)
+                    # Lightweight progress parsing for eddblink progress lines
+                    import re
+                    cur_file = None
+                    line_buf = ''
+
+                    def fmt_bytes(n: int) -> str:
+                        try:
+                            units = ['B','KB','MB','GB','TB']
+                            f = float(n)
+                            i = 0
+                            while f >= 1024 and i < len(units)-1:
+                                f /= 1024.0
+                                i += 1
+                            return f"{f:.0f}{units[i]}" if units[i]=='B' else f"{f:.1f}{units[i]}"
+                        except Exception:
+                            return str(n)
+
+                    def set_phase(txt: str):
+                        phase["text"] = txt
+
+                    def parse_line(ln: str):
+                        nonlocal cur_file
+                        txt = (ln or '').strip()
+                        if not txt:
+                            return
+                        # Detect file context
+                        m = re.search(r"Downloading file '([^']+)'", txt)
+                        if not m:
+                            m = re.search(r"update to '([^']+)'", txt)
+                        if m:
+                            cur_file = m.group(1)
+                            try:
+                                bg_progress.configure(mode='indeterminate')
+                                bg_progress.start(10)
+                            except Exception:
+                                pass
+                            set_phase(cur_file)
+                            return
+                        # Detect size progress: e.g. 56810423/613975343 0:00:03
+                        m = re.search(r"(\d+)\s*/\s*(\d+)\s+(\d+:\d+(?::\d+)?)", txt)
+                        if m:
+                            cur = int(m.group(1))
+                            tot = int(m.group(2))
+                            try:
+                                bg_progress.configure(mode='determinate', maximum=tot, value=cur)
+                            except Exception:
+                                pass
+                            if cur_file:
+                                pct = int((cur / tot) * 100) if tot else 0
+                                set_phase(f"{cur_file} {fmt_bytes(cur)}/{fmt_bytes(tot)} {pct}%")
+                            return
+
                     while proc.poll() is None and not stop_flag["stopped"]:
                         chunk = fh.read(1)
                         if not chunk:
                             time.sleep(0.25)
                             continue
                         try:
+                            # Stream into log output (ANSI stripped, CR-aware)
                             self._feed_stream(output, chunk)
+                            # Build a line buffer for progress parsing
+                            ch = chunk
+                            if ch == '\r' or ch == '\n':
+                                parse_line(line_buf)
+                                line_buf = ''
+                            else:
+                                if ch != '\x1b':
+                                    line_buf += ch
                         except Exception:
                             pass
             except Exception:
@@ -1093,14 +1330,45 @@ class TdGuiApp(tk.Tk):
                 stop_btn.state(["disabled"])
             except Exception:
                 pass
-            # Update status as finished
+            # Update status as finished with elapsed time
             try:
-                status_var.set("Finished (see log)")
+                try:
+                    start_ts = timer["start"]  # type: ignore[name-defined]
+                except Exception:
+                    start_ts = None
+                if start_ts is not None:
+                    elapsed = time.monotonic() - start_ts
+                    status_var.set(f"Finished ({self._format_elapsed(elapsed)})")
+                else:
+                    status_var.set("Finished (00:00)")
             except Exception:
                 pass
-            # Resume any preempted background sessions after finish
-            if resume_after:
-                self.after(0, lambda lst=resume_after: self._resume_preempted_list(lst))
+            # Stop background progress bar
+            try:
+                bg_progress.stop()
+            except Exception:
+                pass
+            # Auto-backup shortly after finish
+            try:
+                self.after(500, self._auto_backup_if_enabled)
+            except Exception:
+                pass
+            # Chain next task if requested and prior succeeded; else resume preempted sessions
+            try:
+                rc = proc.poll()
+            except Exception:
+                rc = None
+            if chain and rc == 0 and not stop_flag.get("stopped"):
+                nxt = dict(chain[0])
+                rest = chain[1:]
+                # Use provided title or infer
+                next_args = nxt.get('args')
+                next_title = nxt.get('title') or self._background_title_for_args(next_args) or "Next Task"
+                # Only resume preempted sessions after the last task in the chain
+                self.after(0, lambda a=next_args, t=next_title, r=rest: self._run_background(a, t, resume_after=resume_after if not r else None, chain=r))
+            else:
+                if resume_after:
+                    self.after(0, lambda lst=resume_after: self._resume_preempted_list(lst))
 
         threading.Thread(target=tailer, daemon=True).start()
 
@@ -1112,7 +1380,11 @@ class TdGuiApp(tk.Tk):
                 return
             elapsed = time.monotonic() - timer["start"]
             try:
-                status_var.set(f"Running ({self._format_elapsed(elapsed)})")
+                extra = phase.get("text") or ""
+                if extra:
+                    status_var.set(f"Running ({self._format_elapsed(elapsed)}) — {extra}")
+                else:
+                    status_var.set(f"Running ({self._format_elapsed(elapsed)})")
             except Exception:
                 pass
             timer["job"] = self.after(1000, tick)
@@ -1150,6 +1422,24 @@ class TdGuiApp(tk.Tk):
                     stop_btn.state(["disabled"])
                 except Exception:
                     pass
+                # Show stopped with elapsed time
+                try:
+                    try:
+                        start_ts = timer["start"]  # type: ignore[name-defined]
+                    except Exception:
+                        start_ts = None
+                    if start_ts is not None:
+                        elapsed = time.monotonic() - start_ts
+                        status_var.set(f"Stopped ({self._format_elapsed(elapsed)})")
+                    else:
+                        status_var.set("Stopped (00:00)")
+                except Exception:
+                    pass
+                # Stop background progress bar when stopping
+                try:
+                    bg_progress.stop()
+                except Exception:
+                    pass
             self.after(3000, _ensure)
 
         stop_btn.configure(command=stop_bg)
@@ -1166,6 +1456,7 @@ class TdGuiApp(tk.Tk):
             'title': title_hint,
             'stop_flag': stop_flag,
             'args': list(args),
+            'progress': bg_progress,
         }
         # Insert this tab just before Help
         try:
@@ -1398,7 +1689,8 @@ class TdGuiApp(tk.Tk):
     def _init_stream_state(self, widget):
         if not hasattr(self, '_stream_state'):
             self._stream_state = {}
-        self._stream_state[widget] = {'buf': ''}
+        # Keep a small state dict per-widget: current line buffer and ANSI parsing state
+        self._stream_state[widget] = {'buf': '', 'ansi': False}
 
     def _feed_stream(self, widget, data: str):
         st = getattr(self, '_stream_state', {}).get(widget)
@@ -1406,8 +1698,19 @@ class TdGuiApp(tk.Tk):
             self._init_stream_state(widget)
             st = self._stream_state.get(widget)
         buf = st['buf']
-        # Process char by char to handle CR and LF
+        in_ansi = st.get('ansi', False)
+        # Process char by char to handle CR/LF and strip ANSI color codes
         for ch in data:
+            # ANSI escape handling (strip from display)
+            if in_ansi:
+                # End an ANSI sequence when a letter byte arrives (typical for CSI)
+                if ('A' <= ch <= 'Z') or ('a' <= ch <= 'z'):
+                    in_ansi = False
+                # Do not add ANSI bytes to buffer
+                continue
+            if ch == '\x1b':  # ESC starts an ANSI sequence
+                in_ansi = True
+                continue
             if ch == '\r':
                 self._flush_stream(widget, st, replace=True)
             elif ch == '\n':
@@ -1416,6 +1719,7 @@ class TdGuiApp(tk.Tk):
                 buf += ch
                 st['buf'] = buf
         st['buf'] = buf
+        st['ansi'] = in_ansi
 
     def _flush_stream(self, widget, st, replace: bool, newline: bool = False):
         text = st.get('buf', '')
@@ -1692,6 +1996,11 @@ class TdGuiApp(tk.Tk):
                 # default to pretty text
                 self._export_txt(self._strip_ansi(text), path, pretty=True)
             messagebox.showinfo("Export", f"Exported to:\n{path}")
+            # Reveal the file in the platform file manager for convenience
+            try:
+                self._reveal_in_file_manager(path)
+            except Exception:
+                pass
         except Exception as e:
             messagebox.showerror("Export Failed", str(e))
 
@@ -1733,6 +2042,7 @@ class TdGuiApp(tk.Tk):
                 title="Export Settings",
                 defaultextension=".json",
                 initialfile=initial,
+                initialdir=self._settings_dir(),
                 filetypes=[
                     ("JSON", "*.json"),
                     ("All Files", "*.*"),
@@ -1742,7 +2052,16 @@ class TdGuiApp(tk.Tk):
                 return
             with open(path, 'w', encoding='utf-8') as f:
                 json.dump(payload, f, indent=2)
+            # Remember chosen folder for future imports/auto-backups
+            try:
+                self._set_settings_dir(os.path.dirname(path))
+            except Exception:
+                pass
             messagebox.showinfo("Export Settings", f"Exported settings to:\n{path}")
+            try:
+                self._reveal_in_file_manager(path)
+            except Exception:
+                pass
         except Exception as e:
             messagebox.showerror("Export Settings Failed", str(e))
 
@@ -1752,6 +2071,7 @@ class TdGuiApp(tk.Tk):
             import json
             path = filedialog.askopenfilename(
                 title="Import Settings",
+                initialdir=self._settings_dir(),
                 filetypes=[
                     ("JSON", "*.json"),
                     ("All Files", "*.*"),
@@ -1761,6 +2081,11 @@ class TdGuiApp(tk.Tk):
                 return
             with open(path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
+            # Remember folder for auto-backup
+            try:
+                self._set_settings_dir(os.path.dirname(path))
+            except Exception:
+                pass
 
             # Determine command label and snapshot
             label = None
@@ -2003,6 +2328,11 @@ class TdGuiApp(tk.Tk):
             self._show_stop_btn()
         except Exception:
             pass
+        # Show and start the progress bar
+        try:
+            self._show_progress()
+        except Exception:
+            pass
         # Cancel any previous scheduled job
         try:
             if getattr(self, "_timer_job", None):
@@ -2038,6 +2368,11 @@ class TdGuiApp(tk.Tk):
             self._hide_stop_btn()
         except Exception:
             pass
+        # Hide the progress bar when finished
+        try:
+            self._hide_progress()
+        except Exception:
+            pass
 
     def _show_stop_btn(self):
         try:
@@ -2050,6 +2385,100 @@ class TdGuiApp(tk.Tk):
         try:
             self.stop_btn.state(["disabled"])
             self.stop_btn.grid_remove()
+        except Exception:
+            pass
+
+    # ----- Auto-backup helpers -----
+    def _on_toggle_autobackup(self):
+        try:
+            state = 'normal' if bool(self.autobackup_var.get()) else 'disabled'
+            try:
+                self.autobackup_entry.configure(state=state)
+            except Exception:
+                # ttk state fallback
+                if state == 'normal':
+                    self.autobackup_entry.state(["!disabled"])  # type: ignore[attr-defined]
+                else:
+                    self.autobackup_entry.state(["disabled"])  # type: ignore[attr-defined]
+        except Exception:
+            pass
+
+    def _validate_backup_name(self, name: str) -> bool:
+        import re
+        if not name:
+            return False
+        # allow letters, numbers, dash, underscore, dot
+        return re.match(r'^[A-Za-z0-9._-]+$', name) is not None
+
+    def _ensure_backup_name(self) -> Optional[str]:
+        name = self.autobackup_name_var.get().strip() if hasattr(self, 'autobackup_name_var') else ''
+        if self.autobackup_var.get() and not self._validate_backup_name(name):
+            try:
+                from tkinter import simpledialog
+                name = simpledialog.askstring("Auto-Backup", "Enter backup filename (no spaces; A-Z, 0-9, ._-):", initialvalue="TD_Backup") or ''
+            except Exception:
+                name = name
+        if self.autobackup_var.get() and not self._validate_backup_name(name):
+            messagebox.showerror("Auto-Backup", "Please provide a valid backup filename (A–Z, 0–9, dash/underscore/dot).")
+            return None
+        try:
+            self.autobackup_name_var.set(name)
+        except Exception:
+            pass
+        return name
+
+    def _export_settings_to_path(self, label: Optional[str], path: str):
+        try:
+            import json
+            if not label:
+                label = self.cmd_var.get()
+            if not label or not self.current_meta:
+                return
+            snap = self._capture_session(label)
+            payload = {
+                'version': 1,
+                'exported_at': time.strftime('%Y-%m-%d %H:%M:%S'),
+                'selected_command': label,
+                'globals': self._globals_snapshot(),
+                'commands': {label: snap},
+            }
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, 'w', encoding='utf-8') as f:
+                json.dump(payload, f, indent=2)
+        except Exception:
+            pass
+
+    def _auto_backup_if_enabled(self):
+        try:
+            if not hasattr(self, 'autobackup_var') or not self.autobackup_var.get():
+                return
+            name = self.autobackup_name_var.get().strip()
+            if not self._validate_backup_name(name):
+                return
+            fname = name if name.lower().endswith('.json') else name + '.json'
+            dest_dir = self._settings_dir()
+            path = os.path.join(dest_dir, fname)
+            self._export_settings_to_path(self.cmd_var.get(), path)
+        except Exception:
+            pass
+
+    def _show_progress(self):
+        try:
+            if hasattr(self, 'run_progress') and self.run_progress:
+                self.run_progress.grid()
+                # Smooth animation; adjust interval if needed
+                self.run_progress.start(10)
+        except Exception:
+            pass
+
+    def _hide_progress(self):
+        try:
+            if hasattr(self, 'run_progress') and self.run_progress:
+                try:
+                    self.run_progress.stop()
+                except Exception:
+                    pass
+                self.run_progress.grid_remove()
         except Exception:
             pass
 
@@ -2075,6 +2504,30 @@ class TdGuiApp(tk.Tk):
     def _prefs_path(self) -> str:
         return os.path.join(self._config_dir(), 'td_gui_prefs.json')
 
+    # ----- Settings dir helpers (for import/export/autobackup) -----
+    def _settings_dir(self) -> str:
+        try:
+            data = getattr(self, '_prefs', {}) or {}
+            sd = data.get('settings_dir')
+            if not sd:
+                sd = os.path.join(self._config_dir(), 'settings')
+            os.makedirs(sd, exist_ok=True)
+            return sd
+        except Exception:
+            return self._config_dir()
+
+    def _set_settings_dir(self, path: str):
+        try:
+            if not path:
+                return
+            data = dict(getattr(self, '_prefs', {}) or {})
+            data['settings_dir'] = path
+            self._prefs = data
+            # Save soon
+            self._schedule_save(500)
+        except Exception:
+            pass
+
     def _load_prefs(self):
         try:
             p = self._prefs_path()
@@ -2090,6 +2543,9 @@ class TdGuiApp(tk.Tk):
                 detail = self._prefs.get('detail')
                 quiet = self._prefs.get('quiet')
                 debug = self._prefs.get('debug')
+                settings_dir = self._prefs.get('settings_dir')
+                autobackup = self._prefs.get('autobackup')
+                autobackup_name = self._prefs.get('autobackup_name')
                 self._restore_cmd = self._prefs.get('selected_command')
                 if isinstance(cwd, str):
                     self.cwd_var.set(cwd)
@@ -2103,6 +2559,20 @@ class TdGuiApp(tk.Tk):
                     self.quiet_var.set(quiet)
                 if isinstance(debug, int):
                     self.debug_var.set(debug)
+                if isinstance(autobackup, bool):
+                    try:
+                        self.autobackup_var.set(autobackup)
+                        # Enable/disable entry accordingly
+                        self._on_toggle_autobackup()
+                    except Exception:
+                        pass
+                if isinstance(autobackup_name, str):
+                    try:
+                        self.autobackup_name_var.set(autobackup_name)
+                    except Exception:
+                        pass
+                if isinstance(settings_dir, str):
+                    self._prefs['settings_dir'] = settings_dir
         except Exception:
             # Ignore preference loading errors silently
             self._prefs = {}
@@ -2136,6 +2606,9 @@ class TdGuiApp(tk.Tk):
                 'quiet': int(self.quiet_var.get()),
                 'debug': int(self.debug_var.get()),
                 'selected_command': self.cmd_var.get(),
+                'autobackup': bool(self.autobackup_var.get()) if hasattr(self, 'autobackup_var') else False,
+                'autobackup_name': self.autobackup_name_var.get().strip() if hasattr(self, 'autobackup_name_var') else '',
+                'settings_dir': data.get('settings_dir') or os.path.join(self._config_dir(), 'settings'),
             })
             # Legacy path handled by snapshot above; nothing further needed for current command
             self._prefs = data
@@ -2577,10 +3050,21 @@ class TdGuiApp(tk.Tk):
 
         # Notebook
         style.configure("TNotebook", background=c["bg"], borderwidth=0, tabmargins=(6, 4, 6, 0))
-        style.configure("TNotebook.Tab", background=c["panel"], foreground=c["fg"], padding=(12, 6), bordercolor=c["line"])
+        style.configure("TNotebook.Tab", background=c["panel"], foreground=c["fg"], padding=(12, 6), bordercolor=c["line"]) 
         style.map("TNotebook.Tab",
                   background=[('selected', c["surface"]), ('active', c["panel"])],
                   foreground=[('selected', c["fg"])])
+
+        # Progress bar
+        try:
+            style.configure(
+                "Loading.Horizontal.TProgressbar",
+                troughcolor=c["panel"],
+                background=c["primary"],
+                bordercolor=c["line"],
+            )
+        except Exception:
+            pass
 
         # Route card styles
         try:

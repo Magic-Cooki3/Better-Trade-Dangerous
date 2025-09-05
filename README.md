@@ -69,3 +69,9 @@ Useful Links
 - Original project wiki: https://github.com/eyeonus/Trade-Dangerous/wiki
 - EDDN schemas: https://github.com/EDCD/EDDN/tree/master/schemas
 - EDMC / EDDN info: https://github.com/EDCD/EDMarketConnector/wiki
+
+Developer Notes: Placeholder Stations and WITHOUT ROWID
+- Schema: `Station` is defined `WITHOUT ROWID` and uses an explicit `station_id` primary key.
+- Placeholders: When parsing legacy `.prices` content or OCR‑noisy station names, the cache builder may create a local placeholder station so price lines can be imported. Because `WITHOUT ROWID` disables implicit rowids, placeholder rows must be inserted with an explicit primary key — we use negative `station_id` values (e.g., −1, −2, …) to avoid colliding with real IDs.
+- Scope: Placeholders exist only in the local SQLite DB; they are not written back to the CSV templates. They let routes work when price lines reference a station not present in the current CSV snapshot.
+- Cleanup: As soon as a proper Station entry arrives via Spansh/EDDB imports, normal positive IDs replace placeholders organically. Tools that query by foreign key should tolerate negative station IDs.

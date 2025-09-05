@@ -468,8 +468,16 @@ def processPrices(tdenv: TradeEnv, priceFile: Path, db: sqlite3.Connection, defa
                 return
             name = utils.titleFixup(stationName)
             inscur = db.cursor()
+            # WITHOUT ROWID tables require explicit primary keys; use a negative placeholder id
+            try:
+                row = db.execute("SELECT COALESCE(MIN(station_id), 0) FROM Station").fetchone()
+                min_id = int(row[0]) if row and row[0] is not None else 0
+                placeholder_id = min_id - 1 if min_id <= 0 else -1
+            except Exception:
+                placeholder_id = -1
             inscur.execute("""
                 INSERT INTO Station (
+                    station_id,
                     system_id, name,
                     ls_from_star,
                     blackmarket,
@@ -478,11 +486,12 @@ def processPrices(tdenv: TradeEnv, priceFile: Path, db: sqlite3.Connection, defa
                     shipyard,
                     modified
                 ) VALUES (
+                    ?,
                     ?, ?, 0, '?', '?', '?', '?',
                     DATETIME('now')
                 )
-            """, [systemID, name])
-            newID = inscur.lastrowid
+            """, [placeholder_id, systemID, name])
+            newID = placeholder_id
             stationByName[facility] = newID
             tdenv.NOTE(
                 "Added local station placeholder for {} (#{})", facility, newID

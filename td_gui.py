@@ -839,12 +839,20 @@ class TdGuiApp(tk.Tk):
                 self.after(0, self._finish_timer)
                 return
 
-            with proc.stdout:
-                try:
-                    for line in iter(proc.stdout.readline, ''):
-                        self._append_output(line)
-                except Exception:
-                    pass
+            # Stream stdout including carriage return updates
+            self._init_stream_state(self.output)
+            try:
+                with proc.stdout:
+                    while True:
+                        ch = proc.stdout.read(1)
+                        if ch == '' and proc.poll() is not None:
+                            break
+                        if not ch:
+                            time.sleep(0.05)
+                            continue
+                        self._feed_stream(self.output, ch)
+            except Exception:
+                pass
             rc = proc.wait()
             # Clear proc handle
             self._proc = None
@@ -1000,14 +1008,14 @@ class TdGuiApp(tk.Tk):
             try:
                 with open(logfile, 'r', encoding='utf-8', errors='replace') as fh:
                     fh.seek(0, os.SEEK_END)
+                    self._init_stream_state(output)
                     while proc.poll() is None and not stop_flag["stopped"]:
-                        line = fh.readline()
-                        if not line:
+                        chunk = fh.read(1)
+                        if not chunk:
                             time.sleep(0.25)
                             continue
                         try:
-                            output.insert(tk.END, line)
-                            output.see(tk.END)
+                            self._feed_stream(output, chunk)
                         except Exception:
                             pass
             except Exception:
@@ -1317,6 +1325,53 @@ class TdGuiApp(tk.Tk):
             self.output.insert(tk.END, text)
             self.output.see(tk.END)
         self.after(0, _append)
+
+    # ----- Streaming helpers (handle carriage returns) -----
+    def _init_stream_state(self, widget):
+        if not hasattr(self, '_stream_state'):
+            self._stream_state = {}
+        self._stream_state[widget] = {'buf': ''}
+
+    def _feed_stream(self, widget, data: str):
+        st = getattr(self, '_stream_state', {}).get(widget)
+        if st is None:
+            self._init_stream_state(widget)
+            st = self._stream_state.get(widget)
+        buf = st['buf']
+        # Process char by char to handle CR and LF
+        for ch in data:
+            if ch == '\r':
+                self._flush_stream(widget, st, replace=True)
+            elif ch == '\n':
+                self._flush_stream(widget, st, replace=False, newline=True)
+            else:
+                buf += ch
+                st['buf'] = buf
+        st['buf'] = buf
+
+    def _flush_stream(self, widget, st, replace: bool, newline: bool = False):
+        text = st.get('buf', '')
+        st['buf'] = ''
+        if not text and not newline:
+            return
+        def _do():
+            try:
+                if replace:
+                    # Replace current line (from line start to end-1c)
+                    widget.delete('end-1c linestart', 'end-1c')
+                    widget.insert(tk.END, text)
+                else:
+                    if text:
+                        widget.insert(tk.END, text)
+                    if newline:
+                        widget.insert(tk.END, '\n')
+                widget.see(tk.END)
+            except Exception:
+                pass
+        try:
+            self.after(0, _do)
+        except Exception:
+            pass
 
     def _clear_output(self):
         self.output.delete("1.0", tk.END)
@@ -1821,10 +1876,10 @@ class TdGuiApp(tk.Tk):
 
     # ----- Run timer helpers -----
     def _format_elapsed(self, seconds: float) -> str:
+        """Format elapsed time as MM:SS (no hours), stopping at the final value."""
         sec = max(0, int(seconds))
-        h, rem = divmod(sec, 3600)
-        m, s = divmod(rem, 60)
-        return f"{h:02d}:{m:02d}:{s:02d}"
+        m, s = divmod(sec, 60)
+        return f"{m:02d}:{s:02d}"
 
     def _tick_timer(self):
         if not getattr(self, "_timer_running", False):
@@ -1848,15 +1903,15 @@ class TdGuiApp(tk.Tk):
                 self.after_cancel(self._timer_job)
         except Exception:
             pass
-        self.run_status_var.set("Running (00:00:00)")
+        self.run_status_var.set("Running (00:00)")
         self._timer_job = self.after(1000, self._tick_timer)
 
     def _finish_timer(self):
         # Stop ticking and show final elapsed
         start = getattr(self, "_timer_start", None)
         if start is None:
-            # Nothing ran; clear status
-            self.run_status_var.set("Finished (00:00:00)")
+            # Nothing ran; clear status (zero elapsed)
+            self.run_status_var.set("Finished (00:00)")
             return
         self._timer_running = False
         try:

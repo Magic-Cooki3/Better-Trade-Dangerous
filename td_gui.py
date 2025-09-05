@@ -377,6 +377,15 @@ class TdGuiApp(tk.Tk):
 
         # Output/Help tabs
         self.tabs = ttk.Notebook(self.right_split)
+        # Track hover state for tab-close affordance
+        self._hover_close_tab_id: Optional[str] = None
+        # Bind mouse events to manage hover 'x' and closing
+        try:
+            self.tabs.bind("<Motion>", self._on_tab_motion, add=True)
+            self.tabs.bind("<Leave>", self._on_tab_leave, add=True)
+            self.tabs.bind("<Button-1>", self._on_tab_click_close, add=True)
+        except Exception:
+            pass
         # Output tab (foreground runs)
         out_tab = ttk.Frame(self.tabs)
         # Rows: 0 status, 1 splitter
@@ -782,13 +791,21 @@ class TdGuiApp(tk.Tk):
         self._stop_requested = False
         args = [sys.executable, self.trade_py] + self._build_args()
 
+        # Safeguard: pause/stop background writer tabs before DB‑exclusive tasks
+        preempted = []
+        try:
+            if self._requires_db_exclusive(args):
+                preempted = self._preempt_background_sessions()
+        except Exception:
+            preempted = []
+
         # If this is an import we treat as background, start it in its own tab
         bg_title = self._background_title_for_args(args)
         if bg_title:
-            self._run_background(args, bg_title)
+            self._run_background(args, bg_title, resume_after=preempted)
             return
 
-        def reader():
+        def reader(preempted_sessions=preempted):
             try:
                 # Start child in its own process group so we can signal it
                 popen_kwargs = dict(
@@ -836,6 +853,9 @@ class TdGuiApp(tk.Tk):
             self.after(0, self._process_routes_from_output)
             # Persist the latest output for this command so it restores on tab switch
             self.after(0, self._save_prefs)
+            # Resume any preempted background sessions
+            if preempted_sessions:
+                self.after(0, lambda lst=preempted_sessions: self._resume_preempted_list(lst))
 
         threading.Thread(target=reader, daemon=True).start()
 
@@ -913,7 +933,7 @@ class TdGuiApp(tk.Tk):
         except Exception:
             return None
 
-    def _run_background(self, args: List[str], title_hint: str):
+    def _run_background(self, args: List[str], title_hint: str, resume_after: Optional[List[Dict[str, Any]]] = None):
         # Build session tab
         self._bg_counter += 1
 
@@ -1002,6 +1022,9 @@ class TdGuiApp(tk.Tk):
                 status_var.set("Finished (see log)")
             except Exception:
                 pass
+            # Resume any preempted background sessions after finish
+            if resume_after:
+                self.after(0, lambda lst=resume_after: self._resume_preempted_list(lst))
 
         threading.Thread(target=tailer, daemon=True).start()
 
@@ -1065,6 +1088,8 @@ class TdGuiApp(tk.Tk):
             'start': timer["start"],
             'logfile': logfile,
             'title': title_hint,
+            'stop_flag': stop_flag,
+            'args': list(args),
         }
         # Insert this tab just before Help
         try:
@@ -1075,6 +1100,203 @@ class TdGuiApp(tk.Tk):
         # Focus new tab
         try:
             self.tabs.select(tab)
+        except Exception:
+            pass
+
+    # ----- DB exclusive safeguard helpers -----
+    def _requires_db_exclusive(self, full_args: List[str]) -> bool:
+        try:
+            if len(full_args) < 3:
+                return False
+            sub = full_args[2]
+            if sub == 'buildcache':
+                return True
+            if sub != 'import':
+                return False
+            argv = full_args[3:]
+            plug = None
+            options_blob = " ".join(argv)
+            for i, a in enumerate(argv):
+                if a in ('-P', '--plug') and i + 1 < len(argv):
+                    plug = argv[i+1].lower()
+                    break
+            if plug == 'eddblink':
+                # Heaviest when doing clean/all (full schema/data rebuild)
+                if 'clean' in options_blob or 'all' in options_blob:
+                    return True
+            if plug == 'spansh':
+                # Large write import
+                return True
+            return False
+        except Exception:
+            return False
+
+    def _preempt_background_sessions(self) -> List[Dict[str, Any]]:
+        """Stop all running background sessions and return a list of sessions to resume later."""
+        to_resume: List[Dict[str, Any]] = []
+        # Collect current sessions to resume
+        for tab_id, sess in list(self._bg_sessions.items()):
+            try:
+                proc = sess.get('proc')
+                args = sess.get('args')
+                title = sess.get('title')
+                if proc and proc.poll() is None and args:
+                    to_resume.append({'args': list(args), 'title': title})
+                    # Close/stop the tab
+                    self._close_bg_tab(tab_id)
+            except Exception:
+                continue
+        return to_resume
+
+    def _resume_preempted_list(self, resume_list: List[Dict[str, Any]]):
+        try:
+            for ent in resume_list or []:
+                args = ent.get('args')
+                title = ent.get('title') or self._background_title_for_args(args or []) or 'Background Task'
+                if args:
+                    self._run_background(args, title)
+        except Exception:
+            pass
+
+    # ----- Tab close UX -----
+    def _tab_under_pointer(self, x: int, y: int) -> Optional[int]:
+        try:
+            return self.tabs.index(f"@{x},{y}")
+        except Exception:
+            return None
+
+    def _tab_id_from_index(self, idx: int) -> Optional[str]:
+        try:
+            tab_widget = self.tabs.tabs()[idx]
+            return tab_widget
+        except Exception:
+            return None
+
+    def _is_closable_tab(self, tab_id: str) -> bool:
+        return tab_id in self._bg_sessions
+
+    def _restore_tab_title(self, tab_id: str):
+        try:
+            if tab_id in self._bg_sessions:
+                title = self._bg_sessions[tab_id].get('title') or ''
+                self.tabs.tab(tab_id, text=title)
+        except Exception:
+            pass
+
+    def _show_tab_close_glyph(self, tab_id: str):
+        try:
+            if tab_id in self._bg_sessions:
+                base = self._bg_sessions[tab_id].get('title') or ''
+                # Append a small space and the multiplication sign
+                self.tabs.tab(tab_id, text=f"{base}  ×")
+        except Exception:
+            pass
+
+    def _on_tab_motion(self, event=None):
+        try:
+            x, y = event.x, event.y
+        except Exception:
+            return
+        idx = self._tab_under_pointer(x, y)
+        if idx is None:
+            # Not over a tab; restore any previous
+            if self._hover_close_tab_id:
+                self._restore_tab_title(self._hover_close_tab_id)
+                self._hover_close_tab_id = None
+            return
+        tab_id = self._tab_id_from_index(idx)
+        if not tab_id:
+            return
+        if self._is_closable_tab(tab_id):
+            # If hovering a new tab, restore old and show on new
+            if self._hover_close_tab_id and self._hover_close_tab_id != tab_id:
+                self._restore_tab_title(self._hover_close_tab_id)
+            self._show_tab_close_glyph(tab_id)
+            self._hover_close_tab_id = tab_id
+        else:
+            # Not closable; ensure previous closable restored
+            if self._hover_close_tab_id:
+                self._restore_tab_title(self._hover_close_tab_id)
+                self._hover_close_tab_id = None
+
+    def _on_tab_leave(self, event=None):
+        if self._hover_close_tab_id:
+            self._restore_tab_title(self._hover_close_tab_id)
+            self._hover_close_tab_id = None
+
+    def _on_tab_click_close(self, event=None):
+        try:
+            x, y = event.x, event.y
+        except Exception:
+            return
+        idx = self._tab_under_pointer(x, y)
+        if idx is None:
+            return
+        tab_id = self._tab_id_from_index(idx)
+        if not tab_id or not self._is_closable_tab(tab_id):
+            return
+        # Determine if click was on the rightmost 16px of the tab (close hitbox)
+        try:
+            bx, by, bw, bh = self.tabs.bbox(idx)
+        except Exception:
+            bx = by = bw = bh = 0
+        # Hitbox
+        hx0 = bx + max(bw - 16, 0)
+        hy0 = by
+        hx1 = bx + bw
+        hy1 = by + bh
+        if x >= hx0 and x <= hx1 and y >= hy0 and y <= hy1:
+            # Close the tab (and stop any running process)
+            self._close_bg_tab(tab_id)
+            # Prevent default tab selection
+            return "break"
+
+    def _close_bg_tab(self, tab_id: str):
+        sess = self._bg_sessions.get(tab_id)
+        if not sess:
+            # Not a background tab; nothing to do
+            try:
+                self.tabs.forget(tab_id)
+            except Exception:
+                pass
+            return
+        # Signal stop to running process if any
+        try:
+            proc = sess.get('proc')
+            stop_flag = sess.get('stop_flag')
+            if isinstance(stop_flag, dict):
+                stop_flag['stopped'] = True
+            if proc and proc.poll() is None:
+                import signal
+                if sys.platform.startswith('win'):
+                    try:
+                        proc.send_signal(signal.CTRL_BREAK_EVENT)
+                    except Exception:
+                        try:
+                            proc.terminate()
+                        except Exception:
+                            pass
+                else:
+                    try:
+                        os.killpg(os.getpgid(proc.pid), signal.SIGINT)
+                    except Exception:
+                        try:
+                            proc.send_signal(signal.SIGINT)
+                        except Exception:
+                            try:
+                                proc.terminate()
+                            except Exception:
+                                pass
+        except Exception:
+            pass
+        # Remove tab from notebook
+        try:
+            self.tabs.forget(tab_id)
+        except Exception:
+            pass
+        # Drop session entry
+        try:
+            self._bg_sessions.pop(tab_id, None)
         except Exception:
             pass
 

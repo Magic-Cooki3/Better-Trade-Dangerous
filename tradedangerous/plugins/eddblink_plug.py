@@ -177,7 +177,46 @@ class ImportPlugin(plugins.ImportPluginBase):
         
         self.tdenv.NOTE("Finished purging Systems. End time = {}", self.now())
     
-    def importListings(self, listings_file):
+    def _integrity_ok(self) -> bool:
+        """Run a quick PRAGMA integrity_check; return True if DB is OK."""
+        try:
+            row = self.tdb.getDB().execute("PRAGMA integrity_check").fetchone()
+            return bool(row and str(row[0]).lower() == 'ok')
+        except sqlite3.Error:
+            return False
+
+    def _rebuild_db(self) -> None:
+        """Backup and rebuild the cache DB from SQL + CSV templates."""
+        try:
+            self.tdenv.NOTE("Detected malformed DB; rebuilding cache from templates…")
+            # Close any open connection first
+            try:
+                self.tdb.close()
+            except Exception:
+                pass
+            # Backup existing DB file if present
+            try:
+                path = self.tdb.dbPath
+                if path.exists():
+                    backup = path.with_suffix(path.suffix + ".bak")
+                    try:
+                        # Keep only one backup to avoid clutter
+                        if backup.exists():
+                            backup.unlink()
+                    except Exception:
+                        pass
+                    os.replace(path, backup)
+                    self.tdenv.NOTE("Backed up corrupted DB to {}", str(backup))
+            except Exception:
+                pass
+            # Rebuild cache DB
+            self.tdb.reloadCache()
+            self.tdb.close()
+        except Exception as e:  # pragma: no cover
+            # Best effort; re-raise to surface the failure
+            raise
+
+    def importListings(self, listings_file, _retry: bool = False):
         """
         Updates the market data (AKA the StationItem table) using listings_file
         Writes directly to database.
@@ -193,6 +232,9 @@ class ImportPlugin(plugins.ImportPluginBase):
         
         self.tdenv.NOTE("Processing market data from {}: Start time = {}. Live = {}", listings_file, self.now(), from_live)
         
+        # Quick integrity check before heavy writes
+        if not self._integrity_ok():
+            self._rebuild_db()
         db = self.tdb.getDB()
         stmt_unliven_station = """UPDATE StationItem SET from_live = 0 WHERE station_id = ?"""
         stmt_flush_station   = """DELETE from StationItem WHERE station_id = ?"""
@@ -307,6 +349,21 @@ class ImportPlugin(plugins.ImportPluginBase):
         self.tdb.close()
         
         self.tdenv.NOTE("Finished processing market data. End time = {}", self.now())
+        return
+    
+    def _importListings_with_repair(self, listings_file):
+        """Wrapper to import listings, auto-rebuilding the DB once if malformed."""
+        try:
+            self.importListings(listings_file, _retry=False)
+        except sqlite3.DatabaseError as e:
+            msg = str(e).lower()
+            if 'malformed' in msg or 'disk image is malformed' in msg:
+                self.tdenv.WARN("SQLite reported a malformed database; attempting auto-repair and retry…")
+                self._rebuild_db()
+                # Retry once
+                self.importListings(listings_file, _retry=True)
+            else:
+                raise
     
     def run(self):
         self.tdenv.ignoreUnknown = True
@@ -477,11 +534,11 @@ class ImportPlugin(plugins.ImportPluginBase):
         
         if self.getOption("listings"):
             if self.downloadFile(self.listingsPath) or self.getOption("force"):
-                self.importListings(self.listingsPath)
+                self._importListings_with_repair(self.listingsPath)
 
         if self.getOption("listings_live"):
             if self.downloadFile(self.liveListingsPath) or self.getOption("force"):
-                self.importListings(self.liveListingsPath)
+                self._importListings_with_repair(self.liveListingsPath)
 
         if self.getOption("listings") or self.getOption("listings_live"):
             self.tdenv.NOTE("Regenerating .prices file.")

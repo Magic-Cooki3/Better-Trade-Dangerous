@@ -387,14 +387,18 @@ class TdGuiApp(tk.Tk):
         # Load-command row (shown only for "Add via Command")
         self.loadcmd_frame = ttk.Frame(prev)
         self.loadcmd_frame.columnconfigure(1, weight=1)
+        self.loadcmd_frame.columnconfigure(2, weight=0)
         ttk.Label(self.loadcmd_frame, text="Insert Command:").grid(row=0, column=0, sticky="w")
         self.load_cmd_var = tk.StringVar()
         self.load_cmd_entry = ttk.Entry(self.loadcmd_frame, textvariable=self.load_cmd_var)
-        self.load_cmd_entry.grid(row=0, column=1, sticky="ew", padx=(6,0))
+        self.load_cmd_entry.grid(row=0, column=1, sticky="ew", padx=(6,6))
         try:
             self.load_cmd_entry.bind('<Return>', lambda e: self._load_command_from_text())
         except Exception:
             pass
+        # Quick reload of last imported settings
+        self.reload_last_btn = ttk.Button(self.loadcmd_frame, text="Reload Last", command=self._reload_last_imported_settings, style="Secondary.TButton")
+        self.reload_last_btn.grid(row=0, column=2, sticky="e")
         # Hidden by default
         try:
             self.loadcmd_frame.grid_remove()
@@ -2558,20 +2562,33 @@ class TdGuiApp(tk.Tk):
 
     # ----- Load from pasted CLI command -----
     def _load_command_from_text(self):
-        import shlex
+        import shlex, re
         try:
-            text = (self.load_cmd_var.get() or '').strip()
+            raw = (self.load_cmd_var.get() or '').strip()
         except Exception:
-            text = ''
-        if not text:
+            raw = ''
+        if not raw:
             try:
                 messagebox.showinfo('Load Command', 'Paste a command in the box above.')
             except Exception:
                 pass
             return
+        # If multiple commands were pasted (e.g., 'cmd1 && cmd2'), take the first non-empty
         try:
-            tokens = shlex.split(text, posix=True)
+            first_piece = next((p.strip() for p in re.split(r"(?:&&|;|\r?\n)", raw) if p.strip()), '')
         except Exception:
+            first_piece = raw
+        text = first_piece or raw
+        # Tokenize robustly across platforms
+        tokens = []
+        for posix in (True, False):
+            try:
+                tokens = shlex.split(text, posix=posix)
+                if tokens:
+                    break
+            except Exception:
+                continue
+        if not tokens:
             tokens = text.split()
         if not tokens:
             return
@@ -2600,6 +2617,82 @@ class TdGuiApp(tk.Tk):
         globals_values = {'cwd': None, 'db': None, 'linkly': None, 'detail': 0, 'quiet': 0, 'debug': 0}
         options = {}
 
+        # Build a quick map of known flags from the target command meta so we can
+        # handle packed forms like --db=/path or -Peddblink
+        spec_by_flag = {}
+        short_flags_need_value = set()
+        try:
+            for spec in (self.cmd_metas.get(cmd_name, self.current_meta).arguments + self.cmd_metas.get(cmd_name, self.current_meta).switches):
+                for a in getattr(spec, 'args', ()):
+                    if isinstance(a, str) and a.startswith('-'):
+                        spec_by_flag[a] = spec
+                # short flag that takes a value
+                if not spec.is_flag:
+                    for a in getattr(spec, 'args', ()): 
+                        if isinstance(a, str) and re.fullmatch(r'-[A-Za-z]$', a):
+                            short_flags_need_value.add(a)
+        except Exception:
+            pass
+
+    def _reload_last_imported_settings(self):
+        try:
+            data = dict(getattr(self, '_prefs', {}) or {}).get('last_import')
+            if not isinstance(data, dict):
+                messagebox.showinfo('Reload Last', 'No previously loaded settings found.')
+                return
+            import json
+            # Determine command label and snapshot
+            label = data.get('selected_command')
+            snap = {}
+            if isinstance(data.get('commands'), dict) and label:
+                snap = data['commands'].get(label) or {}
+            # Apply globals if provided
+            gl = data.get('globals') if isinstance(data.get('globals'), dict) else None
+            if gl:
+                try:
+                    if 'cwd' in gl:
+                        self.cwd_var.set(gl.get('cwd') or '')
+                    if 'db' in gl:
+                        self.db_var.set(gl.get('db') or '')
+                    if 'linkly' in gl:
+                        self.linkly_var.set(gl.get('linkly') or '')
+                    if 'detail' in gl:
+                        self.detail_var.set(int(gl.get('detail') or 0))
+                    if 'quiet' in gl:
+                        self.quiet_var.set(int(gl.get('quiet') or 0))
+                    if 'debug' in gl:
+                        self.debug_var.set(int(gl.get('debug') or 0))
+                except Exception:
+                    pass
+            if not label or not snap:
+                messagebox.showerror('Reload Last', 'Stored settings file is missing command data.')
+                return
+            if label not in self.cmd_metas:
+                messagebox.showerror('Reload Last', f"Command '{label}' is not available in this build.")
+                return
+            # Merge snapshot into prefs and switch UI
+            pref_data = dict(getattr(self, '_prefs', {}) or {})
+            cmds = pref_data.setdefault('commands', {})
+            base = dict(cmds.get(label, {}) or {})
+            base.update(snap)
+            cmds[label] = base
+            pref_data['selected_command'] = label
+            old_susp = getattr(self, '_suspend_save', False)
+            try:
+                self._suspend_save = True
+                self._prefs = pref_data
+                self.cmd_var.set(label)
+                self._on_command_change()
+            finally:
+                self._suspend_save = old_susp
+            self._save_prefs()
+            messagebox.showinfo('Reload Last', f"Reloaded settings for command: {label}")
+        except Exception as e:
+            try:
+                messagebox.showerror('Reload Last', str(e))
+            except Exception:
+                pass
+
         j = 0
         while j < len(argv):
             t = argv[j]
@@ -2607,6 +2700,19 @@ class TdGuiApp(tk.Tk):
             if t in ('-v', '-q', '-w'):
                 key = {'-v': 'detail', '-q': 'quiet', '-w': 'debug'}[t]
                 globals_values[key] += 1
+                j += 1
+                continue
+            # Collapsed verbosity -vvv, -qq, -ww
+            if re.fullmatch(r'-v+', t):
+                globals_values['detail'] += max(1, len(t) - 1)
+                j += 1
+                continue
+            if re.fullmatch(r'-q+', t):
+                globals_values['quiet'] += max(1, len(t) - 1)
+                j += 1
+                continue
+            if re.fullmatch(r'-w+', t):
+                globals_values['debug'] += max(1, len(t) - 1)
                 j += 1
                 continue
             if t in globals_map:
@@ -2618,6 +2724,26 @@ class TdGuiApp(tk.Tk):
                     globals_values[key] = ''
                     j += 1
                 continue
+            # Long form --opt=value
+            if t.startswith('--') and '=' in t:
+                k, v = t.split('=', 1)
+                if k in globals_map:
+                    globals_values[globals_map[k]] = v
+                else:
+                    options.setdefault(k, []).append(v)
+                j += 1
+                continue
+            # Short form -Xvalue where -X needs a value
+            if re.fullmatch(r'-[A-Za-z].+', t):
+                k = t[:2]
+                if k in short_flags_need_value:
+                    v = t[2:]
+                    if k in globals_map:
+                        globals_values[globals_map[k]] = v
+                    else:
+                        options.setdefault(k, []).append(v)
+                    j += 1
+                    continue
             # Regular option or flag (long or short)
             if t.startswith('-'):
                 if nxt is not None and not nxt.startswith('-'):
@@ -2671,6 +2797,7 @@ class TdGuiApp(tk.Tk):
 
         # Map tokens to specs
         try:
+            # Refresh spec map for the now-active command
             spec_by_flag = {}
             for spec in (self.current_meta.arguments + self.current_meta.switches):
                 for a in getattr(spec, 'args', ()):
@@ -2740,6 +2867,29 @@ class TdGuiApp(tk.Tk):
             self._save_prefs()
             # Focus Selected Options area for visibility
             self.tabs.select(0)
+        except Exception:
+            pass
+        # Remember last imported settings for quick reload
+        try:
+            label = self.cmd_var.get()
+            if label and self.current_meta:
+                snap = self._capture_session(label)
+                payload = {
+                    'version': 1,
+                    'exported_at': time.strftime('%Y-%m-%d %H:%M:%S'),
+                    'selected_command': label,
+                    'globals': self._globals_snapshot(),
+                    'commands': {label: snap},
+                    'text': text,
+                }
+                data = dict(getattr(self, '_prefs', {}) or {})
+                data['last_import'] = payload
+                self._prefs = data
+                self._save_prefs()
+                try:
+                    self.reload_last_btn.state(["!disabled"])  # type: ignore[attr-defined]
+                except Exception:
+                    pass
         except Exception:
             pass
 
@@ -2827,6 +2977,16 @@ class TdGuiApp(tk.Tk):
                         pass
                 if isinstance(settings_dir, str):
                     self._prefs['settings_dir'] = settings_dir
+                # Enable reload-last button if we have a stored import
+                try:
+                    if getattr(self, 'reload_last_btn', None):
+                        last = self._prefs.get('last_import')
+                        if last:
+                            self.reload_last_btn.state(["!disabled"])  # type: ignore[attr-defined]
+                        else:
+                            self.reload_last_btn.state(["disabled"])  # type: ignore[attr-defined]
+                except Exception:
+                    pass
         except Exception:
             # Ignore preference loading errors silently
             self._prefs = {}

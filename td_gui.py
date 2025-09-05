@@ -322,7 +322,7 @@ class TdGuiApp(tk.Tk):
         left_container.rowconfigure(0, weight=1)
         left_container.columnconfigure(0, weight=1)
         self.main_pane.add(left_container, weight=1)
-
+        
         self.selector_canvas = tk.Canvas(left_container, highlightthickness=0, bg=self.colors["bg"], bd=0)
         self.selector_scroll = ttk.Scrollbar(left_container, orient=tk.VERTICAL, command=self.selector_canvas.yview)
         self.selector_frame = ttk.Frame(self.selector_canvas)
@@ -343,6 +343,17 @@ class TdGuiApp(tk.Tk):
         right_container.rowconfigure(0, weight=1)
         right_container.columnconfigure(0, weight=1)
         self.main_pane.add(right_container, weight=3)
+
+        # Prevent panes from collapsing and set initial sash positions after layout
+        try:
+            self.main_pane.pane(left_container, minsize=260)
+        except Exception:
+            pass
+        self._user_main_sash = False
+        try:
+            self.main_pane.bind('<ButtonRelease-1>', lambda e: setattr(self, '_user_main_sash', True))
+        except Exception:
+            pass
 
         # Vertical splitter between selected options (top) and output/help (bottom)
         self.right_split = ttk.Panedwindow(right_container, orient=tk.VERTICAL, style="RightSplit.TPanedwindow")
@@ -458,12 +469,26 @@ class TdGuiApp(tk.Tk):
 
         # Add top/bottom panes to the vertical splitter with weights
         try:
+            # Enforce a minimum height for the top pane and establish default sash later
+            self.right_split.pane(self.selected_frame, minsize=180)
+        except Exception:
+            pass
+        try:
             self.right_split.add(self.selected_frame, weight=1)
             self.right_split.add(self.tabs, weight=2)
         except Exception:
             # Fallback if weights unsupported
             self.right_split.add(self.selected_frame)
             self.right_split.add(self.tabs)
+        # Detect if user drags the vertical sash; only auto-place once on startup
+        self._user_right_sash = False
+        try:
+            self.right_split.bind('<ButtonRelease-1>', lambda e: setattr(self, '_user_right_sash', True))
+        except Exception:
+            pass
+        # After everything is laid out, place sashes to give each pane visible space
+        self._sashes_initialized = False
+        self.after(150, self._init_sashes)
 
     def _build_global_options(self):
         bottom = ttk.LabelFrame(self, text="Global Options")
@@ -529,6 +554,35 @@ class TdGuiApp(tk.Tk):
         self.detail_var.trace_add("write", lambda *_: self._save_prefs())
         self.quiet_var.trace_add("write", lambda *_: self._save_prefs())
         self.debug_var.trace_add("write", lambda *_: self._save_prefs())
+
+    def _init_sashes(self):
+        # Set initial sash positions once, unless the user already moved them
+        if getattr(self, '_sashes_initialized', False):
+            return
+        try:
+            mw = self.main_pane.winfo_width()
+            mh = self.right_split.winfo_height()
+        except Exception:
+            mw = mh = 0
+        if not mw or not mh or mw <= 1 or mh <= 1:
+            # Try again shortly after first geometry settle
+            self.after(150, self._init_sashes)
+            return
+        # Main left/right: ~30% to left, but at least 260px
+        if not getattr(self, '_user_main_sash', False):
+            pos = max(260, min(int(mw * 0.30), mw - 400))
+            try:
+                self.main_pane.sashpos(0, pos)
+            except Exception:
+                pass
+        # Right vertical split: ~40% to top (Selected Options), but at least 200px
+        if not getattr(self, '_user_right_sash', False):
+            vpos = max(200, min(int(mh * 0.40), mh - 220))
+            try:
+                self.right_split.sashpos(0, vpos)
+            except Exception:
+                pass
+        self._sashes_initialized = True
 
     def _clear_option_frames(self):
         # Clear selector and selected entries
@@ -839,20 +893,34 @@ class TdGuiApp(tk.Tk):
                 self.after(0, self._finish_timer)
                 return
 
-            # Stream stdout including carriage return updates
-            self._init_stream_state(self.output)
+            # Stream stdout: only use CR-aware streaming for long-running progress commands
+            is_progress = False
             try:
-                with proc.stdout:
-                    while True:
-                        ch = proc.stdout.read(1)
-                        if ch == '' and proc.poll() is not None:
-                            break
-                        if not ch:
-                            time.sleep(0.05)
-                            continue
-                        self._feed_stream(self.output, ch)
+                is_progress = (len(args) >= 3 and args[2] in ('import', 'buildcache'))
             except Exception:
-                pass
+                is_progress = False
+
+            if is_progress:
+                self._init_stream_state(self.output)
+                try:
+                    with proc.stdout:
+                        while True:
+                            ch = proc.stdout.read(1)
+                            if ch == '' and proc.poll() is not None:
+                                break
+                            if not ch:
+                                time.sleep(0.05)
+                                continue
+                            self._feed_stream(self.output, ch)
+                except Exception:
+                    pass
+            else:
+                try:
+                    with proc.stdout:
+                        for line in iter(proc.stdout.readline, ''):
+                            self._append_output(line)
+                except Exception:
+                    pass
             rc = proc.wait()
             # Clear proc handle
             self._proc = None
@@ -1396,7 +1464,12 @@ class TdGuiApp(tk.Tk):
         lines = text.splitlines()
         routes: List[Dict[str, str]] = []
         current: List[str] = []
-        start_pat = re.compile(r"^\s*(.+?)\s*->\s*(.+?)(?:\s*\(score:.*)?\s*$")
+        # Treat only top-level "Origin -> Destination" lines as route headers.
+        # Exclude lines that are jump/cruise descriptions which can also contain "->".
+        start_pat = re.compile(r"^(?!\s*(?:Jump|Direct|Supercruise)\b)\s*(.+?)\s*->\s*(.+?)(?:\s*\(score:.*)?\s*$")
+
+        def norm(s: str) -> str:
+            return re.sub(r"\s+", " ", (s or '').strip()).upper()
         for ln in lines:
             if start_pat.match(ln):
                 if current:
@@ -1405,7 +1478,8 @@ class TdGuiApp(tk.Tk):
                         # Extract destination from the first line of block
                         m = start_pat.match(current[0])
                         dest_line = m.group(2).strip() if m else ""
-                        routes.append({"block": block, "dest": dest_line})
+                        orig_line = m.group(1).strip() if m else ""
+                        routes.append({"block": block, "dest": dest_line, "orig": orig_line, "key": (norm(orig_line), norm(dest_line))})
                     current = []
             if ln.strip() == "":
                 # keep blank lines to preserve block text, but don't accumulate leading empties
@@ -1418,7 +1492,8 @@ class TdGuiApp(tk.Tk):
             if block:
                 m = start_pat.match(current[0])
                 dest_line = m.group(2).strip() if m else ""
-                routes.append({"block": block, "dest": dest_line})
+                orig_line = m.group(1).strip() if m else ""
+                routes.append({"block": block, "dest": dest_line, "orig": orig_line, "key": (norm(orig_line), norm(dest_line))})
         return routes
     
     def _process_routes_from_output(self):
@@ -1451,12 +1526,27 @@ class TdGuiApp(tk.Tk):
         except Exception:
             pass
         # Build cards
-        for idx, rt in enumerate(routes):
+        # Enforce a maximum card count based on --routes (default 1)
+        limit = self._max_route_cards() if self.current_meta and self.current_meta.name == 'run' else None
+        if not limit or limit <= 0:
+            limit = 1
+
+        seen_keys = set()
+        idx = 0
+        for rt in routes:
             card = ttk.Frame(self.routes_frame, style="RouteCard.TFrame")
+            # Dedup identical routes by normalized (origin,destination)
+            title = rt["block"].splitlines()[0].strip()
+            key = rt.get("key") or (title.strip().upper(), rt.get("dest"," ").strip().upper())
+            if key in seen_keys:
+                continue
+            seen_keys.add(key)
+            # Respect --routes limit
+            if idx >= int(limit):
+                break
             card.grid(row=idx, column=0, sticky="ew", padx=2, pady=2)
             card.columnconfigure(0, weight=1)
             # Title (first line)
-            title = rt["block"].splitlines()[0]
             lbl_title = ttk.Label(card, text=title, style="RouteTitle.TLabel")
             lbl_title.grid(row=0, column=0, sticky="w", padx=8, pady=(6,2))
             # Body (optional: show a short preview of next lines)
@@ -1484,6 +1574,22 @@ class TdGuiApp(tk.Tk):
                 except Exception:
                     pass
             self._route_cards.append({"frame": card, "dest": dest, "title": title})
+            idx += 1
+
+    def _max_route_cards(self) -> int:
+        try:
+            # Find '--routes' value from selected options; default is 1
+            for spec, wd in (self._selected or {}).items():
+                try:
+                    if getattr(spec, 'dest', None) == 'routes' or spec.long_flag == '--routes':
+                        val = wd.get('value').get().strip() if wd.get('value') else ''
+                        n = int(val) if val else 1
+                        return max(1, n)
+                except Exception:
+                    continue
+        except Exception:
+            pass
+        return 1
         # Default select first
         if self._route_cards:
             self._select_route_card(0)

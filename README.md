@@ -5,11 +5,31 @@ This fork packages Trade Dangerous with a modern GUI and live data ingestion opt
 
 Requires Python 3.8.19+.
 
+Troubleshooting
+- Import says “database disk image is malformed”:
+  - The GUI/eddblink auto‑repair backs up the DB to `data/TradeDangerous.db.bak`, rebuilds, and retries. If running from the CLI, stop EDDN/other writers first, then rerun. Manual reset: `rm data/TradeDangerous.db && python3 trade.py import -P eddblink -O clean,all,skipvend,force`.
+- Live listings seems slow (10–25 min typical):
+  - The dump is large (tens of MB gzipped → millions of rows). Keep the DB on SSD; pause EDDN during the job to avoid writer contention; avoid `-O optimize` unless needed; use the GUI background tab and let it finish.
+- Multiple route cards when `--routes 1`:
+  - The GUI deduplicates and caps routes; if you still see multiple, make sure the `--routes` value is 1 (default) and you haven’t enabled `--summary` (which prints extra blocks). Report any reproducible cases with the full Output tab text.
+- Run output looks compressed on one line:
+  - The GUI only uses progress‑style streaming for imports/builds; `run` prints as clean line output. If you still see odd wrapping, increase the Output panel height or export the text to verify line breaks.
+- Left or top pane collapsed on startup:
+  - The app now sets initial sash positions (≈30% left, ≈40% top) and minimum sizes. Drag to adjust; it won’t auto‑reset during the session.
+- Carriers missing or docking status unknown:
+  - Import Spansh weekly to refresh station/services/access; keep EDDN Live running. The GUI excludes carriers unless docking access is `All` (public).
+- VACUUM makes imports slow:
+  - That’s expected. Use `-O optimize` occasionally, not every run.
+
 Highlights
 - EDDN Live import (new): Streams commodity snapshots from the public EDDN firehose to keep markets fresh (carriers and fixed stations).
 - GUI background tabs (new): Long‑running imports (EDDN, EDDB Link, Spansh) run in dedicated tabs with their own Stop buttons, while you continue using the main Output tab.
 - Spansh import preset (new): One‑click galaxy data import to seed/update systems, stations, services and carrier docking access.
 - Safer rebuilds: Database rebuild/import flows tolerate unknowns and stale entries better.
+- Progress bars and readable output: Build/import commands render live progress bars; normal commands (like `run`) use clean line output for readability.
+- Route cards: The GUI deduplicates repeated route headers and respects `--routes` (default 1) when showing route cards.
+- Closable tabs: Hover background tabs to reveal a “×” and click to stop/close. Foreground runs have their own red Stop button.
+- Resilient layout: The left selector and the top “Selected Options” pane stay visible on startup; sashes remember user movement during the session.
 
 Install
 - Optional venv
@@ -37,6 +57,36 @@ Keeping Data Fresh
 - EDDN Live: Leave running while you play for the freshest markets.
 - Spansh: Weekly is a good default (or monthly if EDDN runs continuously). Re‑run if you see unknown stations/systems or service mismatches.
 - EDDB Link: Optional nightly “listings_live” backfill to fill gaps when no one visits a station.
+
+DB Options and Recommended Order/Frequency
+1) Import Spansh Galaxy
+   - What: Seeds/refreshes “galaxy structure” (systems, stations, pad size, services, carrier docking access). No prices.
+   - When: First setup; then weekly (or after major game updates), and whenever you see unknown stations/systems or wrong services.
+   - GUI: “Import Spansh Galaxy” (runs in background).
+
+2) Update/Rebuild DB (EDDB Link: `clean,all,skipvend,force`)
+   - What: Rebuilds schema and CSV‑based tables, then regenerates the DB and `.prices`. Good for first install or major updates.
+   - When: First setup, after major schema/data changes, or if your DB becomes corrupted.
+   - Notes: This is a heavy, DB‑exclusive task. The GUI pauses background writer tabs (EDDN, EDDB Link live, Spansh) before running, then restarts them after.
+
+3) Update Live Listings (EDDB Link: `listings_live`)
+   - What: Imports the community listings live dump to refresh market prices across many stations quickly.
+   - When: Daily, or on demand before planning long runs. Add `-O optimize` occasionally to VACUUM (slower).
+   - Tip: For best speed and to avoid writer contention, don’t run while EDDN Live is ingesting. If you do, SQLite will serialize writers (slower, but safe).
+
+4) EDDN Live (Carriers) or EDDN Live (All Markets)
+   - What: Streams live market snapshots from the community (via ZeroMQ). Carriers preset shows public carriers only; All Markets covers stations too.
+   - When: Keep running while you play. This is the most up‑to‑date global stream wherever players visit.
+   - Notes: Not a one‑shot DB job; runs until you stop it. Hover its tab and click “×” to stop/close.
+
+Initial Order (fresh setup)
+- Import Spansh Galaxy → Update/Rebuild DB → Update Live Listings → start EDDN Live.
+
+Ongoing cadence
+- EDDN Live: continuous while playing.
+- Update Live Listings: daily or on demand.
+- Spansh: weekly (or monthly if EDDN stays on and your area is stable).
+- Rebuild DB: rarely; first setup or after big upstream changes.
 
 GUI Overview
 - Launch: python3 td_gui.py

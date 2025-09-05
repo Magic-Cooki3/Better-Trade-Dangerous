@@ -649,6 +649,28 @@ class TradeDB:
         conn.execute("PRAGMA temp_store=MEMORY")
         conn.execute("PRAGMA auto_vacuum=INCREMENTAL")
         
+        # Lightweight, version-safe schema migration: ensure carrier_docking_access exists
+        try:
+            cur = conn.execute("PRAGMA table_info('Station')")
+            needs_col = True
+            for row in cur.fetchall():
+                # row[1] is column name per PRAGMA table_info documentation
+                if str(row[1]).lower() == 'carrier_docking_access':
+                    needs_col = False
+                    break
+            if needs_col:
+                self.tdenv.DEBUG0("Adding missing Station.carrier_docking_access column")
+                try:
+                    conn.execute("ALTER TABLE Station ADD COLUMN carrier_docking_access TEXT")
+                except sqlite3.Error as e:
+                    self.tdenv.DEBUG1("ALTER TABLE failed or not needed: {}", e)
+                try:
+                    conn.execute("UPDATE Station SET carrier_docking_access = '?' WHERE carrier_docking_access IS NULL")
+                except sqlite3.Error:
+                    pass
+        except sqlite3.Error as e:  # pragma: no cover
+            self.tdenv.DEBUG1("PRAGMA table_info failed: {}", e)
+
         conn.create_function('dist2', 6, TradeDB.calculateDistance2)
         self.conn = conn
         return conn

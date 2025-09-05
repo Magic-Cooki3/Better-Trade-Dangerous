@@ -128,13 +128,41 @@ def load_commands() -> Dict[str, CommandMeta]:
         switches=[],
         fixed_args=["import", "-P", "eddblink", "-O", "clean,all,skipvend,force"],
     )
-    # Add a one-click rebuild option that forces rebuild and ignores unknowns
-    metas["Rebuild DB (-i -f)"] = CommandMeta(
-        name="buildcache",
-        help="Convenience: rebuild cache, ignore unknown entries and force overwrite",
+    # (Removed preset: Rebuild Cache (-i -f))
+    # Update only live listings via eddblink
+    metas["Update Live Listings"] = CommandMeta(
+        name="import",
+        help="Convenience: import eddblink live market listings",
         arguments=[],
         switches=[],
-        fixed_args=["buildcache", "-i", "-f"],
+        fixed_args=["import", "-P", "eddblink", "-O", "listings_live"],
+    )
+
+    # Start EDDN Live (carriers only, public access)
+    metas["EDDN Live (Carriers)"] = CommandMeta(
+        name="import",
+        help="Start EDDN live updates for public Fleet Carriers",
+        arguments=[],
+        switches=[],
+        fixed_args=["import", "-P", "eddn", "-O", "carrier_only,public_only"],
+    )
+
+    # Start EDDN Live (all markets)
+    metas["EDDN Live (All Markets)"] = CommandMeta(
+        name="import",
+        help="Start EDDN live updates for all markets",
+        arguments=[],
+        switches=[],
+        fixed_args=["import", "-P", "eddn"],
+    )
+
+    # Spansh galaxy import (seed/update systems, stations, services)
+    metas["Import Spansh Galaxy"] = CommandMeta(
+        name="import",
+        help="Import galaxy data (systems/stations/services) from Spansh",
+        arguments=[],
+        switches=[],
+        fixed_args=["import", "-P", "spansh"],
     )
     return metas
 
@@ -172,6 +200,12 @@ class TdGuiApp(tk.Tk):
         self.cmd_metas = load_commands()
         self.current_meta: Optional[CommandMeta] = None
         self.widget_vars: Dict[OptionSpec, Dict[str, Any]] = {}
+        # Foreground subprocess control (Output tab)
+        self._proc = None
+        self._stop_requested = False
+        # Background sessions (e.g., EDDN live) keyed by tab widget name
+        self._bg_sessions: Dict[str, Dict[str, Any]] = {}
+        self._bg_counter = 0
 
         # Paths
         self.repo_dir = os.path.dirname(__file__)
@@ -195,8 +229,8 @@ class TdGuiApp(tk.Tk):
         except Exception:
             pass
 
-        # Initialize with the first command
-        all_cmds = sorted(self.cmd_metas)
+        # Initialize with the first command (custom ordering)
+        all_cmds = self._ordered_command_labels()
         if all_cmds:
             # Use restored command if available
             restore_cmd = getattr(self, "_restore_cmd", None)
@@ -214,6 +248,22 @@ class TdGuiApp(tk.Tk):
         except Exception:
             pass
 
+    def _ordered_command_labels(self) -> List[str]:
+        """Return command labels with preferred presets first.
+        Order: Update/Rebuild DB, Update Live Listings, EDDN Live presets, Spansh import, then the rest sorted.
+        """
+        keys = list(self.cmd_metas.keys())
+        preferred = [
+            "Update/Rebuild DB",
+            "Update Live Listings",
+            "EDDN Live (Carriers)",
+            "EDDN Live (All Markets)",
+            "Import Spansh Galaxy",
+        ]
+        head = [k for k in preferred if k in keys]
+        tail = sorted([k for k in keys if k not in head])
+        return head + tail
+
     # ----- Top bar -----
     def _build_topbar(self):
         top = ttk.Frame(self)
@@ -225,7 +275,7 @@ class TdGuiApp(tk.Tk):
         self.cmd_combo = ttk.Combobox(
             top,
             textvariable=self.cmd_var,
-            values=sorted(self.cmd_metas),
+            values=self._ordered_command_labels(),
             state="readonly",
             width=20,
         )
@@ -327,16 +377,29 @@ class TdGuiApp(tk.Tk):
 
         # Output/Help tabs
         self.tabs = ttk.Notebook(self.right_split)
-        # Output tab
+        # Output tab (foreground runs)
         out_tab = ttk.Frame(self.tabs)
-        # 0: status, 1: split between routes and console
+        # Rows: 0 status, 1 splitter
         out_tab.rowconfigure(0, weight=0)
         out_tab.rowconfigure(1, weight=1)
         out_tab.columnconfigure(0, weight=1)
+        # Status bar container: keeps layout stable when Stop hides/shows
+        self.status_row = ttk.Frame(out_tab)
+        self.status_row.grid(row=0, column=0, sticky="ew")
+        self.status_row.columnconfigure(0, weight=0)
+        self.status_row.columnconfigure(1, weight=1)
         # Status line above output
         self.run_status_var = tk.StringVar(value="")
-        self.run_status = ttk.Label(out_tab, textvariable=self.run_status_var)
-        self.run_status.grid(row=0, column=0, sticky="w", padx=4, pady=(2,2))
+        # Stop button (red with white text) to the left of the timer
+        self.stop_btn = ttk.Button(self.status_row, text="Stop", command=self._stop_run, style="Stop.TButton")
+        # Hidden by default until a run starts
+        try:
+            self.stop_btn.state(["disabled"])
+        except Exception:
+            pass
+        # Will be gridded dynamically while a command is running
+        self.run_status = ttk.Label(self.status_row, textvariable=self.run_status_var)
+        self.run_status.grid(row=0, column=1, sticky="w", padx=4, pady=(2,2))
         # Vertical splitter exactly between route cards and console output
         self.out_split = ttk.Panedwindow(out_tab, orient=tk.VERTICAL, style="OutSplit.TPanedwindow")
         self.out_split.grid(row=1, column=0, sticky="nsew")
@@ -371,17 +434,17 @@ class TdGuiApp(tk.Tk):
             pass
         self._bind_mousewheel_target(self.output)
         # Help tab
-        help_tab = ttk.Frame(self.tabs)
-        help_tab.rowconfigure(0, weight=1)
-        help_tab.columnconfigure(0, weight=1)
-        self.help_text = ScrolledText(help_tab, wrap="word", height=12)
+        self.help_tab = ttk.Frame(self.tabs)
+        self.help_tab.rowconfigure(0, weight=1)
+        self.help_tab.columnconfigure(0, weight=1)
+        self.help_text = ScrolledText(self.help_tab, wrap="word", height=12)
         self.help_text.grid(row=0, column=0, sticky="nsew")
         self._style_scrolled_text(self.help_text)
         # Also allow copying from Help
         self._enable_copy_shortcuts(self.help_text)
         self._bind_mousewheel_target(self.help_text)
         self.tabs.add(out_tab, text="Output")
-        self.tabs.add(help_tab, text="Help")
+        self.tabs.add(self.help_tab, text="Help")
         self.tabs.bind("<<NotebookTabChanged>>", self._on_tab_changed)
 
         # Add top/bottom panes to the vertical splitter with weights
@@ -716,12 +779,19 @@ class TdGuiApp(tk.Tk):
         self.output.delete("1.0", tk.END)
         self._start_timer()
         self._clear_routes()
+        self._stop_requested = False
         args = [sys.executable, self.trade_py] + self._build_args()
+
+        # If this is an import we treat as background, start it in its own tab
+        bg_title = self._background_title_for_args(args)
+        if bg_title:
+            self._run_background(args, bg_title)
+            return
 
         def reader():
             try:
-                proc = subprocess.Popen(
-                    args,
+                # Start child in its own process group so we can signal it
+                popen_kwargs = dict(
                     cwd=self.repo_dir,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
@@ -729,15 +799,38 @@ class TdGuiApp(tk.Tk):
                     bufsize=1,
                     env={**os.environ, "PYTHONIOENCODING": "UTF-8"},
                 )
+                if sys.platform.startswith('win'):
+                    try:
+                        popen_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP  # type: ignore[attr-defined]
+                    except Exception:
+                        pass
+                else:
+                    try:
+                        import os as _os
+                        popen_kwargs["preexec_fn"] = _os.setsid
+                    except Exception:
+                        pass
+
+                proc = subprocess.Popen(
+                    args,
+                    **popen_kwargs,
+                )
+                # Expose handle for Stop button
+                self._proc = proc
             except Exception as e:
                 self._append_output(f"Failed to start: {e}\n")
                 self.after(0, self._finish_timer)
                 return
 
             with proc.stdout:
-                for line in iter(proc.stdout.readline, ''):
-                    self._append_output(line)
+                try:
+                    for line in iter(proc.stdout.readline, ''):
+                        self._append_output(line)
+                except Exception:
+                    pass
             rc = proc.wait()
+            # Clear proc handle
+            self._proc = None
             self.after(0, self._finish_timer)
             # Post-process output to extract routes (on main thread)
             self.after(0, self._process_routes_from_output)
@@ -745,6 +838,245 @@ class TdGuiApp(tk.Tk):
             self.after(0, self._save_prefs)
 
         threading.Thread(target=reader, daemon=True).start()
+
+    def _stop_run(self):
+        # Send an interrupt signal to the running process and stop quickly
+        proc = getattr(self, "_proc", None)
+        if not proc:
+            return
+        self._stop_requested = True
+        try:
+            self.run_status_var.set("Stopping...")
+        except Exception:
+            pass
+        try:
+            import signal
+            if sys.platform.startswith('win'):
+                try:
+                    proc.send_signal(signal.CTRL_BREAK_EVENT)
+                except Exception:
+                    try:
+                        proc.terminate()
+                    except Exception:
+                        pass
+            else:
+                try:
+                    os.killpg(os.getpgid(proc.pid), signal.SIGINT)
+                except Exception:
+                    try:
+                        proc.send_signal(signal.SIGINT)
+                    except Exception:
+                        try:
+                            proc.terminate()
+                        except Exception:
+                            pass
+        except Exception:
+            pass
+        # Fallback: if still running after a short delay, force kill
+        def _ensure_kill(p=proc):
+            try:
+                if p.poll() is None:
+                    p.kill()
+            except Exception:
+                pass
+        try:
+            self.after(3000, _ensure_kill)
+        except Exception:
+            pass
+
+    # ----- Background sessions (EDDN Live) -----
+    def _background_title_for_args(self, full_args: List[str]) -> Optional[str]:
+        try:
+            if len(full_args) < 4:
+                return None
+            sub = full_args[2]
+            if sub != 'import':
+                return None
+            argv = full_args[3:]
+            plug = None
+            options_blob = " ".join(argv)
+            for i, a in enumerate(argv):
+                if a in ('-P', '--plug') and i + 1 < len(argv):
+                    plug = argv[i+1].lower()
+                    break
+            if plug == 'eddn':
+                if 'carrier_only' in options_blob or 'public_only' in options_blob:
+                    return 'EDDN Live (Carriers)'
+                return 'EDDN Live (All)'
+            if plug == 'spansh':
+                return 'Import Spansh Galaxy'
+            if plug == 'eddblink':
+                if 'listings_live' in options_blob:
+                    return 'EDDB Link (Live Listings)'
+                return 'EDDB Link Import'
+            return None
+        except Exception:
+            return None
+
+    def _run_background(self, args: List[str], title_hint: str):
+        # Build session tab
+        self._bg_counter += 1
+
+        tab = ttk.Frame(self.tabs)
+        tab.rowconfigure(0, weight=0)
+        tab.rowconfigure(1, weight=1)
+        tab.columnconfigure(0, weight=1)
+
+        # Status row with Stop + timer
+        status_row = ttk.Frame(tab)
+        status_row.grid(row=0, column=0, sticky="ew")
+        status_row.columnconfigure(0, weight=0)
+        status_row.columnconfigure(1, weight=1)
+        status_var = tk.StringVar(value="Running (00:00:00)")
+        stop_btn = ttk.Button(status_row, text="Stop", style="Stop.TButton")
+        stop_btn.grid(row=0, column=0, sticky="w", padx=(4,6), pady=(2,2))
+        ttk.Label(status_row, textvariable=status_var).grid(row=0, column=1, sticky="w", padx=4, pady=(2,2))
+
+        # Output area tails a log file
+        output = ScrolledText(tab, wrap="word")
+        self._style_scrolled_text(output)
+        self._enable_copy_shortcuts(output)
+        self._bind_mousewheel_target(output)
+        output.grid(row=1, column=0, sticky="nsew")
+
+        # Prepare log path
+        try:
+            logs_dir = os.path.join(self.repo_dir, 'logs')
+            os.makedirs(logs_dir, exist_ok=True)
+        except Exception:
+            logs_dir = self.repo_dir
+        logfile = os.path.join(logs_dir, f"eddn_live_{time.strftime('%Y%m%d_%H%M%S')}_{self._bg_counter}.log")
+
+        # Start background process writing to log
+        env = {**os.environ, "PYTHONIOENCODING": "UTF-8", "PYTHONUNBUFFERED": "1"}
+        _stdout_file = open(logfile, 'w', encoding='utf-8', buffering=1)
+        popen_kwargs = dict(cwd=self.repo_dir, stdout=_stdout_file, stderr=subprocess.STDOUT, universal_newlines=True, bufsize=1, env=env)
+        if sys.platform.startswith('win'):
+            try:
+                popen_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP  # type: ignore[attr-defined]
+            except Exception:
+                pass
+        else:
+            try:
+                import os as _os
+                popen_kwargs["preexec_fn"] = _os.setsid
+            except Exception:
+                pass
+        try:
+            proc = subprocess.Popen(args, **popen_kwargs)
+        except Exception as e:
+            self._append_output(f"Failed to start background task: {e}\n")
+            return
+        finally:
+            try:
+                _stdout_file.close()
+            except Exception:
+                pass
+
+        # Tail the logfile in a thread
+        stop_flag = {"stopped": False}
+
+        def tailer():
+            try:
+                with open(logfile, 'r', encoding='utf-8', errors='replace') as fh:
+                    fh.seek(0, os.SEEK_END)
+                    while proc.poll() is None and not stop_flag["stopped"]:
+                        line = fh.readline()
+                        if not line:
+                            time.sleep(0.25)
+                            continue
+                        try:
+                            output.insert(tk.END, line)
+                            output.see(tk.END)
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+            # Process finished
+            try:
+                stop_btn.state(["disabled"])
+            except Exception:
+                pass
+            # Update status as finished
+            try:
+                status_var.set("Finished (see log)")
+            except Exception:
+                pass
+
+        threading.Thread(target=tailer, daemon=True).start()
+
+        # Timer for this bg session
+        timer = {"start": time.monotonic(), "job": None}
+
+        def tick():
+            if proc.poll() is not None or stop_flag["stopped"]:
+                return
+            elapsed = time.monotonic() - timer["start"]
+            try:
+                status_var.set(f"Running ({self._format_elapsed(elapsed)})")
+            except Exception:
+                pass
+            timer["job"] = self.after(1000, tick)
+
+        timer["job"] = self.after(1000, tick)
+
+        # Stop handler for this session
+        def stop_bg():
+            try:
+                import signal
+                if sys.platform.startswith('win'):
+                    try:
+                        proc.send_signal(signal.CTRL_BREAK_EVENT)
+                    except Exception:
+                        proc.terminate()
+                else:
+                    try:
+                        os.killpg(os.getpgid(proc.pid), signal.SIGINT)
+                    except Exception:
+                        try:
+                            proc.send_signal(signal.SIGINT)
+                        except Exception:
+                            proc.terminate()
+            except Exception:
+                pass
+            # Ensure kill if needed after delay
+            def _ensure():
+                try:
+                    if proc.poll() is None:
+                        proc.kill()
+                except Exception:
+                    pass
+                stop_flag["stopped"] = True
+                try:
+                    stop_btn.state(["disabled"])
+                except Exception:
+                    pass
+            self.after(3000, _ensure)
+
+        stop_btn.configure(command=stop_bg)
+
+        # Register session and add tab before Help
+        tab_id = str(tab)
+        self._bg_sessions[tab_id] = {
+            'proc': proc,
+            'output': output,
+            'status_var': status_var,
+            'stop_btn': stop_btn,
+            'start': timer["start"],
+            'logfile': logfile,
+            'title': title_hint,
+        }
+        # Insert this tab just before Help
+        try:
+            help_index = self.tabs.index(self.help_tab)
+        except Exception:
+            help_index = 'end'
+        self.tabs.insert(help_index, tab, text=title_hint)
+        # Focus new tab
+        try:
+            self.tabs.select(tab)
+        except Exception:
+            pass
 
     def _append_output(self, text: str):
         def _append():
@@ -1235,13 +1567,15 @@ class TdGuiApp(tk.Tk):
     def _on_tab_changed(self, event=None):
         # Load help when Help tab is selected
         try:
-            current = self.tabs.index(self.tabs.select())
+            sel = self.tabs.select()
+            widget = self.tabs.nametowidget(sel)
         except Exception:
             return
-        if current == 1:
+        if widget is self.help_tab:
             self._show_help()
-        # Persist selected tab index for the current command
+        # Persist selected tab index for the current command (foreground UX only)
         try:
+            current = self.tabs.index(sel)
             label = self.cmd_var.get()
             data = dict(getattr(self, '_prefs', {}) or {})
             cmd_state = data.setdefault('commands', {}).setdefault(label, {})
@@ -1269,6 +1603,11 @@ class TdGuiApp(tk.Tk):
     def _start_timer(self):
         self._timer_start = time.monotonic()
         self._timer_running = True
+        # Show and enable the Stop button while running
+        try:
+            self._show_stop_btn()
+        except Exception:
+            pass
         # Cancel any previous scheduled job
         try:
             if getattr(self, "_timer_job", None):
@@ -1292,7 +1631,32 @@ class TdGuiApp(tk.Tk):
         except Exception:
             pass
         elapsed = time.monotonic() - start
-        self.run_status_var.set(f"Finished ({self._format_elapsed(elapsed)})")
+        try:
+            if getattr(self, "_stop_requested", False):
+                self.run_status_var.set(f"Stopped ({self._format_elapsed(elapsed)})")
+            else:
+                self.run_status_var.set(f"Finished ({self._format_elapsed(elapsed)})")
+        except Exception:
+            self.run_status_var.set(f"Finished ({self._format_elapsed(elapsed)})")
+        # Hide the Stop button when no command is running
+        try:
+            self._hide_stop_btn()
+        except Exception:
+            pass
+
+    def _show_stop_btn(self):
+        try:
+            self.stop_btn.grid(row=0, column=0, sticky="w", padx=(4,6), pady=(2,2))
+            self.stop_btn.state(["!disabled"])
+        except Exception:
+            pass
+
+    def _hide_stop_btn(self):
+        try:
+            self.stop_btn.state(["disabled"])
+            self.stop_btn.grid_remove()
+        except Exception:
+            pass
 
     def _copy_preview(self):
         try:
@@ -1660,7 +2024,7 @@ class TdGuiApp(tk.Tk):
             self.quiet_var.set(0)
             self.debug_var.set(0)
             # Reset to initial command ordering
-            all_cmds = sorted(self.cmd_metas)
+            all_cmds = self._ordered_command_labels()
             if all_cmds:
                 self.cmd_var.set(all_cmds[0])
                 self._on_command_change()
@@ -1808,6 +2172,13 @@ class TdGuiApp(tk.Tk):
 
         style.configure("Secondary.TButton", background=c["secondary"], foreground=c["fg"], bordercolor=c["secondary"], relief="flat")
         style.map("Secondary.TButton", background=[('active', c["secondaryActive"])])
+
+        # Stop button style: red background with white text
+        try:
+            style.configure("Stop.TButton", background="#d9534f", foreground="#ffffff", bordercolor="#d9534f", relief="flat")
+            style.map("Stop.TButton", background=[('active', "#c9302c")], foreground=[('active', "#ffffff")])
+        except Exception:
+            pass
 
         # Notebook
         style.configure("TNotebook", background=c["bg"], borderwidth=0, tabmargins=(6, 4, 6, 0))

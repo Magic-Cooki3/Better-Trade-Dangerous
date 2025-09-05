@@ -76,11 +76,50 @@ class CommandEnv(TradeEnv):
         if pathlib.Path.exists(db_change):
             try:
                 import ijson
-                with open(db_change) as file:
+                import json
+                db = self.tdb.getDB()
+                with open(db_change, 'r', encoding='utf-8') as file:
                     for change in ijson.items(file, 'item'):
-                        self.tdb.getDB().execute(change)
+                        # Support either plain SQL strings or structured operations
+                        if isinstance(change, str):
+                            try:
+                                db.execute(change)
+                            except sqlite3.OperationalError as e:
+                                # Be tolerant of older SQLite versions (e.g., IF NOT EXISTS not supported)
+                                self.DEBUG1("DB change skipped due to error: {} (sql: {})", e, change)
+                        elif isinstance(change, dict) and 'add_column' in change:
+                            spec = change['add_column'] or {}
+                            table = spec.get('table')
+                            column = spec.get('column')
+                            coltype = spec.get('type', 'TEXT')
+                            if not table or not column:
+                                continue
+                            # Check if the column already exists
+                            # Use quoted table name in pragma for safety
+                            try:
+                                cur = db.execute(f"PRAGMA table_info('{table}')")
+                                exists = any(row[1] == column for row in cur.fetchall())
+                            except sqlite3.Error as e:  # pragma: no cover
+                                self.DEBUG1("PRAGMA table_info failed: {}", e)
+                                exists = True  # Avoid attempting a risky ALTER
+                            if not exists:
+                                try:
+                                    db.execute(f"ALTER TABLE {table} ADD COLUMN {column} {coltype}")
+                                except sqlite3.Error as e:
+                                    self.DEBUG1("ALTER TABLE add column failed: {}", e)
+                        else:
+                            # Unknown directive form; ignore safely
+                            try:
+                                sql = str(change)
+                                if sql.strip():
+                                    db.execute(sql)
+                            except Exception:
+                                pass
             finally:
-                db_change.unlink()
+                try:
+                    db_change.unlink()
+                except Exception:
+                    pass
         
         self.checkMFD()
         self.checkFromToNear()

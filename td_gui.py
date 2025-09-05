@@ -1245,7 +1245,8 @@ class TdGuiApp(tk.Tk):
         hy0 = by
         hx1 = bx + bw
         hy1 = by + bh
-        if x >= hx0 and x <= hx1 and y >= hy0 and y <= hy1:
+        # If we're hovering a closable tab, allow click anywhere on the tab header to close
+        if self._hover_close_tab_id == tab_id or (x >= hx0 and x <= hx1 and y >= hy0 and y <= hy1):
             # Close the tab (and stop any running process)
             self._close_bg_tab(tab_id)
             # Prevent default tab selection
@@ -1287,6 +1288,17 @@ class TdGuiApp(tk.Tk):
                                 proc.terminate()
                             except Exception:
                                 pass
+                # Ensure kill after a grace period if still running
+                def _ensure_kill(p=proc):
+                    try:
+                        if p.poll() is None:
+                            p.kill()
+                    except Exception:
+                        pass
+                try:
+                    self.after(3000, _ensure_kill)
+                except Exception:
+                    pass
         except Exception:
             pass
         # Remove tab from notebook

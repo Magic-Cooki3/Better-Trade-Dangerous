@@ -120,14 +120,6 @@ def load_commands() -> Dict[str, CommandMeta]:
         arguments = _flatten_args(getattr(module, "arguments", []))
         switches = _flatten_args(getattr(module, "switches", []))
         metas[cmd_name] = CommandMeta(cmd_name, help_text, arguments, switches)
-    # Special utility: paste a CLI command and load settings/UI from it
-    metas["Add via Command"] = CommandMeta(
-        name="loadcmd",
-        help="Paste a CLI command to load options into the UI",
-        arguments=[],
-        switches=[],
-        fixed_args=None,
-    )
     # Add a convenience action for updating/rebuilding the DB via eddblink plugin
     metas["Update All (DB + Live Listings)"] = CommandMeta(
         name="import",
@@ -313,7 +305,6 @@ class TdGuiApp(tk.Tk):
         keys = list(self.cmd_metas.keys())
         preferred = [
             "Update All (DB + Live Listings)",
-            "Add via Command",
             "Update/Rebuild DB",
             "Update Live Listings",
             "EDDN Live (Carriers)",
@@ -384,26 +375,7 @@ class TdGuiApp(tk.Tk):
         reset_btn = ttk.Button(prev, text="Reset", command=self._reset_defaults)
         reset_btn.grid(row=0, column=4, sticky="ew")
 
-        # Load-command row (shown only for "Add via Command")
-        self.loadcmd_frame = ttk.Frame(prev)
-        self.loadcmd_frame.columnconfigure(1, weight=1)
-        self.loadcmd_frame.columnconfigure(2, weight=0)
-        ttk.Label(self.loadcmd_frame, text="Insert Command:").grid(row=0, column=0, sticky="w")
-        self.load_cmd_var = tk.StringVar()
-        self.load_cmd_entry = ttk.Entry(self.loadcmd_frame, textvariable=self.load_cmd_var)
-        self.load_cmd_entry.grid(row=0, column=1, sticky="ew", padx=(6,6))
-        try:
-            self.load_cmd_entry.bind('<Return>', lambda e: self._load_command_from_text())
-        except Exception:
-            pass
-        # Quick reload of last imported settings
-        self.reload_last_btn = ttk.Button(self.loadcmd_frame, text="Reload Last", command=self._reload_last_imported_settings, style="Secondary.TButton")
-        self.reload_last_btn.grid(row=0, column=2, sticky="e")
-        # Hidden by default
-        try:
-            self.loadcmd_frame.grid_remove()
-        except Exception:
-            pass
+        # (removed: Add via Command UI)
 
     # ----- Forms (top) + Output (bottom) -----
     def _build_main_area(self):
@@ -743,19 +715,7 @@ class TdGuiApp(tk.Tk):
         if not self.current_meta:
             return
 
-        # Toggle Load-Command UI and Run button mode
-        try:
-            if self.current_meta.name == 'loadcmd':
-                # Show loadcmd frame and switch run button to loader
-                self.loadcmd_frame.grid(row=1, column=0, columnspan=5, sticky='ew', pady=(6,0))
-                self._set_run_button_mode('load')
-                # Clear preview for clarity
-                self.preview_var.set('')
-            else:
-                self.loadcmd_frame.grid_remove()
-                self._set_run_button_mode('run')
-        except Exception:
-            pass
+        # (removed: Add via Command toggle)
 
         # Build left selector groups and pre-select required args
         groups = self._categorize_current()
@@ -976,10 +936,7 @@ class TdGuiApp(tk.Tk):
             cmd1 = [sys.executable, self.trade_py] + a1
             cmd2 = [sys.executable, self.trade_py] + a2
             parts = cmd1 + ["&&"] + cmd2
-        elif label == "Add via Command":
-            # Preview not applicable — user pastes a full command below
-            self.preview_var.set("")
-            return
+        # (removed: Add via Command preview branch)
         else:
             args = self._build_args()
             # Render a shell-like preview
@@ -2451,11 +2408,9 @@ class TdGuiApp(tk.Tk):
             pass
 
     def _set_run_button_mode(self, mode: str = 'run'):
+        # Always keep normal Run behavior; 'Add via Command' removed
         try:
-            if mode == 'load':
-                self.run_btn.configure(text='Load Command', command=self._load_command_from_text, style='Success.TButton')
-            else:
-                self.run_btn.configure(text='Run', command=self._run, style='Accent.TButton')
+            self.run_btn.configure(text='Run', command=self._run, style='Accent.TButton')
         except Exception:
             pass
 
@@ -2561,338 +2516,7 @@ class TdGuiApp(tk.Tk):
             pass
 
     # ----- Load from pasted CLI command -----
-    def _load_command_from_text(self):
-        import shlex, re
-        try:
-            raw = (self.load_cmd_var.get() or '').strip()
-        except Exception:
-            raw = ''
-        if not raw:
-            try:
-                messagebox.showinfo('Load Command', 'Paste a command in the box above.')
-            except Exception:
-                pass
-            return
-        # If multiple commands were pasted (e.g., 'cmd1 && cmd2'), take the first non-empty
-        try:
-            first_piece = next((p.strip() for p in re.split(r"(?:&&|;|\r?\n)", raw) if p.strip()), '')
-        except Exception:
-            first_piece = raw
-        text = first_piece or raw
-        # Tokenize robustly across platforms
-        tokens = []
-        for posix in (True, False):
-            try:
-                tokens = shlex.split(text, posix=posix)
-                if tokens:
-                    break
-            except Exception:
-                continue
-        if not tokens:
-            tokens = text.split()
-        if not tokens:
-            return
-        # Find subcommand token by scanning for a known CLI name
-        cmd_index = None
-        cmd_name = None
-        try:
-            known = set(td_commands.commandIndex.keys())
-        except Exception:
-            known = set()
-        for i, tok in enumerate(tokens):
-            if tok in known:
-                cmd_index = i
-                cmd_name = tok
-                break
-        if cmd_index is None or not cmd_name:
-            try:
-                messagebox.showerror('Load Command', 'Could not detect a Trade Dangerous subcommand (e.g., run, import, buildcache).')
-            except Exception:
-                pass
-            return
-        argv = tokens[cmd_index+1:]
-
-        # Parse globals and options
-        globals_map = {'-C': 'cwd', '--db': 'db', '-L': 'linkly'}
-        globals_values = {'cwd': None, 'db': None, 'linkly': None, 'detail': 0, 'quiet': 0, 'debug': 0}
-        options = {}
-
-        # Build a quick map of known flags from the target command meta so we can
-        # handle packed forms like --db=/path or -Peddblink
-        spec_by_flag = {}
-        short_flags_need_value = set()
-        try:
-            for spec in (self.cmd_metas.get(cmd_name, self.current_meta).arguments + self.cmd_metas.get(cmd_name, self.current_meta).switches):
-                for a in getattr(spec, 'args', ()):
-                    if isinstance(a, str) and a.startswith('-'):
-                        spec_by_flag[a] = spec
-                # short flag that takes a value
-                if not spec.is_flag:
-                    for a in getattr(spec, 'args', ()): 
-                        if isinstance(a, str) and re.fullmatch(r'-[A-Za-z]$', a):
-                            short_flags_need_value.add(a)
-        except Exception:
-            pass
-
-    def _reload_last_imported_settings(self):
-        try:
-            data = dict(getattr(self, '_prefs', {}) or {}).get('last_import')
-            if not isinstance(data, dict):
-                messagebox.showinfo('Reload Last', 'No previously loaded settings found.')
-                return
-            import json
-            # Determine command label and snapshot
-            label = data.get('selected_command')
-            snap = {}
-            if isinstance(data.get('commands'), dict) and label:
-                snap = data['commands'].get(label) or {}
-            # Apply globals if provided
-            gl = data.get('globals') if isinstance(data.get('globals'), dict) else None
-            if gl:
-                try:
-                    if 'cwd' in gl:
-                        self.cwd_var.set(gl.get('cwd') or '')
-                    if 'db' in gl:
-                        self.db_var.set(gl.get('db') or '')
-                    if 'linkly' in gl:
-                        self.linkly_var.set(gl.get('linkly') or '')
-                    if 'detail' in gl:
-                        self.detail_var.set(int(gl.get('detail') or 0))
-                    if 'quiet' in gl:
-                        self.quiet_var.set(int(gl.get('quiet') or 0))
-                    if 'debug' in gl:
-                        self.debug_var.set(int(gl.get('debug') or 0))
-                except Exception:
-                    pass
-            if not label or not snap:
-                messagebox.showerror('Reload Last', 'Stored settings file is missing command data.')
-                return
-            if label not in self.cmd_metas:
-                messagebox.showerror('Reload Last', f"Command '{label}' is not available in this build.")
-                return
-            # Merge snapshot into prefs and switch UI
-            pref_data = dict(getattr(self, '_prefs', {}) or {})
-            cmds = pref_data.setdefault('commands', {})
-            base = dict(cmds.get(label, {}) or {})
-            base.update(snap)
-            cmds[label] = base
-            pref_data['selected_command'] = label
-            old_susp = getattr(self, '_suspend_save', False)
-            try:
-                self._suspend_save = True
-                self._prefs = pref_data
-                self.cmd_var.set(label)
-                self._on_command_change()
-            finally:
-                self._suspend_save = old_susp
-            self._save_prefs()
-            messagebox.showinfo('Reload Last', f"Reloaded settings for command: {label}")
-        except Exception as e:
-            try:
-                messagebox.showerror('Reload Last', str(e))
-            except Exception:
-                pass
-
-        j = 0
-        while j < len(argv):
-            t = argv[j]
-            nxt = argv[j+1] if (j+1) < len(argv) else None
-            if t in ('-v', '-q', '-w'):
-                key = {'-v': 'detail', '-q': 'quiet', '-w': 'debug'}[t]
-                globals_values[key] += 1
-                j += 1
-                continue
-            # Collapsed verbosity -vvv, -qq, -ww
-            if re.fullmatch(r'-v+', t):
-                globals_values['detail'] += max(1, len(t) - 1)
-                j += 1
-                continue
-            if re.fullmatch(r'-q+', t):
-                globals_values['quiet'] += max(1, len(t) - 1)
-                j += 1
-                continue
-            if re.fullmatch(r'-w+', t):
-                globals_values['debug'] += max(1, len(t) - 1)
-                j += 1
-                continue
-            if t in globals_map:
-                key = globals_map[t]
-                if nxt is not None and not nxt.startswith('-'):
-                    globals_values[key] = nxt
-                    j += 2
-                else:
-                    globals_values[key] = ''
-                    j += 1
-                continue
-            # Long form --opt=value
-            if t.startswith('--') and '=' in t:
-                k, v = t.split('=', 1)
-                if k in globals_map:
-                    globals_values[globals_map[k]] = v
-                else:
-                    options.setdefault(k, []).append(v)
-                j += 1
-                continue
-            # Short form -Xvalue where -X needs a value
-            if re.fullmatch(r'-[A-Za-z].+', t):
-                k = t[:2]
-                if k in short_flags_need_value:
-                    v = t[2:]
-                    if k in globals_map:
-                        globals_values[globals_map[k]] = v
-                    else:
-                        options.setdefault(k, []).append(v)
-                    j += 1
-                    continue
-            # Regular option or flag (long or short)
-            if t.startswith('-'):
-                if nxt is not None and not nxt.startswith('-'):
-                    options.setdefault(t, []).append(nxt)
-                    j += 2
-                else:
-                    options.setdefault(t, None)
-                    j += 1
-            else:
-                # Positional or stray token; keep as special key
-                options.setdefault('__pos__', []).append(t)
-                j += 1
-
-        # Switch UI to detected command
-        label = cmd_name if cmd_name in self.cmd_metas else None
-        if not label:
-            # Fallback: find any label whose meta.name equals cmd_name
-            for k, v in self.cmd_metas.items():
-                if v.name == cmd_name:
-                    label = k
-                    break
-        if not label:
-            try:
-                messagebox.showerror('Load Command', f'Unsupported command: {cmd_name}')
-            except Exception:
-                pass
-            return
-
-        try:
-            self.cmd_var.set(label)
-            self._on_command_change()
-        except Exception:
-            pass
-
-        # Apply globals
-        try:
-            if globals_values['cwd'] is not None:
-                self.cwd_var.set(globals_values['cwd'] or '')
-            if globals_values['db'] is not None:
-                self.db_var.set(globals_values['db'] or '')
-            if globals_values['linkly'] is not None:
-                self.linkly_var.set(globals_values['linkly'] or '')
-            if globals_values['detail']:
-                self.detail_var.set(int(globals_values['detail']))
-            if globals_values['quiet']:
-                self.quiet_var.set(int(globals_values['quiet']))
-            if globals_values['debug']:
-                self.debug_var.set(int(globals_values['debug']))
-        except Exception:
-            pass
-
-        # Map tokens to specs
-        try:
-            # Refresh spec map for the now-active command
-            spec_by_flag = {}
-            for spec in (self.current_meta.arguments + self.current_meta.switches):
-                for a in getattr(spec, 'args', ()):
-                    if isinstance(a, str) and a.startswith('-'):
-                        spec_by_flag[a] = spec
-            # Apply flags/options
-            for k, vals in list(options.items()):
-                if not k or not k.startswith('-'):
-                    continue
-                s = spec_by_flag.get(k)
-                if not s:
-                    # Try matching by long flag from meta
-                    for cand in (self.current_meta.arguments + self.current_meta.switches):
-                        if getattr(cand, 'long_flag', '') == k:
-                            s = cand
-                            break
-                if not s:
-                    continue
-                # Ensure row exists
-                sel_var = self.widget_vars.get(s, {}).get('selected')
-                if sel_var is None or not sel_var.get():
-                    try:
-                        sel_var.set(True)
-                        self._ensure_selected_row(s)
-                    except Exception:
-                        self._ensure_selected_row(s)
-                row = self._selected.get(s)
-                if s.is_flag:
-                    try:
-                        row.get('flag').set(True)
-                    except Exception:
-                        pass
-                else:
-                    # If there are multiple values, join with comma like the UI expects for append
-                    val = ''
-                    if isinstance(vals, list) and vals:
-                        val = ','.join(vals)
-                    # If option present but no value, keep it blank
-                    try:
-                        if row and row.get('value') is not None:
-                            row.get('value').set(val)
-                    except Exception:
-                        pass
-
-            # Positionals: if any defined, assign from __pos__ queue in order
-            pos_vals = options.get('__pos__') or []
-            for spec in self.current_meta.arguments:
-                if spec.is_positional and pos_vals:
-                    try:
-                        sel_var = self.widget_vars.get(spec, {}).get('selected')
-                        if sel_var is None or not sel_var.get():
-                            sel_var.set(True)
-                            self._ensure_selected_row(spec)
-                    except Exception:
-                        self._ensure_selected_row(spec)
-                    row = self._selected.get(spec)
-                    try:
-                        row.get('value').set(pos_vals.pop(0))
-                    except Exception:
-                        pass
-        except Exception:
-            pass
-
-        # Finalize
-        try:
-            self._update_preview()
-            self._save_prefs()
-            # Focus Selected Options area for visibility
-            self.tabs.select(0)
-        except Exception:
-            pass
-        # Remember last imported settings for quick reload
-        try:
-            label = self.cmd_var.get()
-            if label and self.current_meta:
-                snap = self._capture_session(label)
-                payload = {
-                    'version': 1,
-                    'exported_at': time.strftime('%Y-%m-%d %H:%M:%S'),
-                    'selected_command': label,
-                    'globals': self._globals_snapshot(),
-                    'commands': {label: snap},
-                    'text': text,
-                }
-                data = dict(getattr(self, '_prefs', {}) or {})
-                data['last_import'] = payload
-                self._prefs = data
-                self._save_prefs()
-                try:
-                    self.reload_last_btn.state(["!disabled"])  # type: ignore[attr-defined]
-                except Exception:
-                    pass
-        except Exception:
-            pass
-
+    
     # ----- Preferences (persist CWD/DB) -----
     def _config_dir(self) -> str:
         if sys.platform.startswith('win'):
